@@ -16,30 +16,40 @@ class BDFAREClient:
             raise HTTPException(status_code=500, detail="API configuration is missing")
 
         logging.info("Initializing BDFAREClient")
-        self.authenticate()
+        self.authenticate()  # Call the authenticate method during initialization
 
     def authenticate(self):
+        """
+        Authenticate with the BDFARE API to retrieve a token.
+        """
         url = f"{self.base_url}/Authenticate"
         headers = {"Content-Type": "application/json"}
         data = {"apikey": self.apikey}
 
         try:
             logging.info("Attempting to authenticate with BDFARE")
+            logging.debug(f"Request headers: {headers}, Request body: {data}")
+            
             response = requests.post(url, headers=headers, json=data)
-            response.raise_for_status()  # Will raise HTTPError for bad responses
-            logging.debug(f"Authentication response: {response.json()}")  # Log full response for debugging
+            logging.debug(f"Response status: {response.status_code}, Response body: {response.text}")
+            
+            response.raise_for_status()  # Raise HTTPError for bad responses
             self.token = response.json().get("TokenId")
             if not self.token:
-                raise ValueError("Token not found in authentication response.")
+                logging.error("TokenId not found in authentication response.")
+                raise ValueError("TokenId not found in authentication response.")
             logging.info(f"Authentication successful, token received: {self.token}")
         except requests.exceptions.RequestException as e:
-            logging.error(f"Authentication failed: {e}")
+            logging.error(f"Authentication request failed: {e}. Response: {response.text}")
             raise HTTPException(status_code=500, detail=f"Authentication failed: {e}")
         except ValueError as e:
-            logging.error(f"Authentication failed: {e}")
+            logging.error(f"Authentication token parsing failed: {e}")
             raise HTTPException(status_code=500, detail=f"Authentication failed: {e}")
 
     def get_balance(self):
+        """
+        Retrieve balance from the BDFARE API.
+        """
         if not self.token:
             logging.info("Token missing, re-authenticating.")
             self.authenticate()

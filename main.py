@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.flight_services.routes.flyhub.auth import router as flyhub_auth_endpoint
 from app.flight_services.routes.flyhub import balance as flyhub_balance_routes
 from app.flight_services.routes.bdfare import balance as bdfare_balance_routes
 from app.hotel_services.routes import hotel_router
@@ -17,6 +18,7 @@ app = FastAPI(
 )
 
 # Include service routers with appropriate prefixes and tags
+app.include_router(flyhub_auth_endpoint, prefix="/api/flyhub", tags=["Flights"])
 app.include_router(flyhub_balance_routes.router, prefix="/api/flyhub", tags=["Flights"])
 app.include_router(bdfare_balance_routes.router, prefix="/api/bdfare", tags=["Flights"])
 app.include_router(hotel_router, prefix="/hotels", tags=["Hotels"])
