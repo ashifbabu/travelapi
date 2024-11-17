@@ -17,7 +17,7 @@ async def authenticate():
     Returns:
         dict: Authentication token or error details.
     """
-    url = f"{FLYHUB_PRODUCTION_URL}AirSearch"  # Authentication endpoint
+    url = f"{FLYHUB_PRODUCTION_URL}Authenticate"  # Authentication endpoint
     payload = {
         "username": FLYHUB_USERNAME,
         "apikey": FLYHUB_API_KEY
