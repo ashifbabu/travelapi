@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Header, Depends
 import httpx
 import time
-from .auth import cached_token  # Import the token cache
+from .auth import cached_token  # Import the cached token
 
 router = APIRouter()
 
@@ -10,25 +10,32 @@ FLYHUB_PRODUCTION_URL = "https://api.flyhub.com/api/v1/"
 
 
 @router.post("/search")
-async def search_flights(payload: dict):
+async def search_flights(
+    payload: dict,
+    authorization: str = Header(None)  # Accept Authorization header
+):
     """
     Search flights using the FlyHub API.
 
     Args:
-        payload (dict): Flight search request payload.
+        payload (dict): The flight search request payload.
+        authorization (str): The Bearer token passed from the client.
 
     Returns:
         dict: The response from the FlyHub API.
     """
     global cached_token
 
-    # Check if the token is still valid
-    if cached_token["token"] is None or cached_token["expires_at"] < time.time():
-        raise HTTPException(status_code=401, detail="Authentication token is missing or expired. Please re-authenticate.")
+    # Use the provided token or fallback to the cached token
+    token = authorization.replace("Bearer ", "") if authorization else cached_token.get("token")
+
+    # Check if the token is valid
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication token is missing. Please re-authenticate.")
 
     url = f"{FLYHUB_PRODUCTION_URL}AirSearch"
     headers = {
-        "Authorization": f"Bearer {cached_token['token']}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
