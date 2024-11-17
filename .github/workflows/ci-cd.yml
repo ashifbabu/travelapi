@@ -33,17 +33,29 @@ jobs:
           chmod 400 api.pem
 
           ssh -o StrictHostKeyChecking=no -i api.pem $USER@$HOST << 'EOF'
+          # Navigate to the project directory
           cd /home/ubuntu/travelapi
+
+          # Pull the latest changes
           git pull origin main
+
+          # Activate the virtual environment and install dependencies
           source venv/bin/activate
           pip install -r requirements.txt
 
-          # Create .env file on EC2
+          # Create or update .env file
           echo "BDFARE_BASE_URL=$BDFARE_BASE_URL" > .env
           echo "BDFARE_API_KEY=$BDFARE_API_KEY" >> .env
           echo "FLYHUB_USERNAME=$FLYHUB_USERNAME" >> .env
           echo "FLYHUB_API_KEY=$FLYHUB_API_KEY" >> .env
           echo "FLYHUB_PRODUCTION_URL=$FLYHUB_PRODUCTION_URL" >> .env
 
-          nohup uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+          # Stop the existing Gunicorn service if running
+          sudo systemctl stop gunicorn || true
+
+          # Start Gunicorn via systemd
+          sudo systemctl start gunicorn
+
+          # Enable Gunicorn to start on boot
+          sudo systemctl enable gunicorn
           EOF
