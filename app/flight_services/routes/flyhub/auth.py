@@ -5,10 +5,14 @@ import time
 
 router = APIRouter()
 
-# FlyHub API credentials
-FLYHUB_USERNAME = os.getenv("FLYHUB_USERNAME", "thecityflyers@Gmail.com")
-FLYHUB_API_KEY = os.getenv("FLYHUB_API_KEY", "g5TiX28v20Dg6BXkLpuTNUk7vEFCFo9igmOwXNvZulqKCoBHcO")
+# Fetch FlyHub API credentials from environment variables
+FLYHUB_USERNAME = os.getenv("FLYHUB_USERNAME")
+FLYHUB_API_KEY = os.getenv("FLYHUB_API_KEY")
 FLYHUB_PRODUCTION_URL = os.getenv("FLYHUB_PRODUCTION_URL", "https://api.flyhub.com/api/v1/")
+
+# Ensure mandatory environment variables are set
+if not FLYHUB_USERNAME or not FLYHUB_API_KEY:
+    raise ValueError("Missing required FlyHub API credentials in the environment variables.")
 
 # Token cache
 cached_token = {"token": None, "expires_at": 0}
@@ -36,10 +40,17 @@ async def authenticate():
 
         if response.status_code == 200:
             token_data = response.json()
+
             # Cache the token and expiration time
-            cached_token["token"] = token_data["token"]
-            cached_token["expires_at"] = time.time() + token_data.get("expires_in", 3600)  # Default to 1 hour if not provided
-            return token_data
+            cached_token["token"] = token_data.get("TokenId")
+            cached_token["expires_at"] = time.time() + 3600  # Default to 1 hour (3600 seconds)
+
+            # Return the token and expiration info
+            return {
+                "token": cached_token["token"],
+                "expires_at": cached_token["expires_at"],
+                "status": "Success"
+            }
         else:
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
