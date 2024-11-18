@@ -22,11 +22,6 @@ jobs:
         env:
           HOST: ec2-13-215-182-72.ap-southeast-1.compute.amazonaws.com
           KEY: ${{ secrets.EC2_KEY }}
-          BDFARE_BASE_URL: ${{ secrets.BDFARE_BASE_URL }}
-          BDFARE_API_KEY: ${{ secrets.BDFARE_API_KEY }}
-          FLYHUB_USERNAME: ${{ secrets.FLYHUB_USERNAME }}
-          FLYHUB_API_KEY: ${{ secrets.FLYHUB_API_KEY }}
-          FLYHUB_PRODUCTION_URL: ${{ secrets.FLYHUB_PRODUCTION_URL }}
           USER: ubuntu
         run: |
           echo "$KEY" > api.pem
@@ -42,13 +37,6 @@ jobs:
           # Activate the virtual environment and install dependencies
           source venv/bin/activate
           pip install -r requirements.txt
-
-          # Create or update .env file
-          echo "BDFARE_BASE_URL=$BDFARE_BASE_URL" > .env
-          echo "BDFARE_API_KEY=$BDFARE_API_KEY" >> .env
-          echo "FLYHUB_USERNAME=$FLYHUB_USERNAME" >> .env
-          echo "FLYHUB_API_KEY=$FLYHUB_API_KEY" >> .env
-          echo "FLYHUB_PRODUCTION_URL=$FLYHUB_PRODUCTION_URL" >> .env
 
           # Stop the existing Gunicorn service if running
           sudo systemctl stop gunicorn || true
