@@ -1,38 +1,46 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 import httpx
+import os
 
 router = APIRouter()
 
-# BDFare API details
-BDFARE_URL = "https://bdf.centralindia.cloudapp.azure.com/api/enterprise/AirShopping"
-BDFARE_API_KEY = "UEwqVXJHJjBXTE5pN0VwKi1WayF2R29UTmNaaTRLX1lVZFRzM09PNVNuMjAkQHkyVFUyI0FOR1JzRm1yQ0g3IQ=="
+# Load BDFare API details from environment variables
+BDFARE_BASE_URL = os.getenv("BDFARE_BASE_URL")
+BDFARE_API_KEY = os.getenv("BDFARE_API_KEY")
 
-@router.post("/search")
+
+@router.post("/airshopping")
 async def search_flights(payload: dict):
     """
-    Search flights using the BDFare API.
-    
+    Search and retrieve flight results using BDFare API.
+
     Args:
         payload (dict): The flight search request payload.
-        
+
     Returns:
         dict: The response from the BDFare API.
     """
+    # Use the API key from the .env file
+    api_key = BDFARE_API_KEY
+
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API key is missing.")
+
+    url = f"{BDFARE_BASE_URL}/AirShopping"
     headers = {
-        "X-API-KEY": BDFARE_API_KEY,
-        "Content-Type": "application/json",
+        "X-API-KEY": api_key,
+        "Content-Type": "application/json"
     }
 
     try:
-        # Send the request to BDFare
+        # Make the flight search request
         async with httpx.AsyncClient() as client:
-            response = await client.post(BDFARE_URL, json=payload, headers=headers)
-        
-        # Check the status code
-        if response.status_code != 200:
+            response = await client.post(url, json=payload, headers=headers)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
-        return response.json()
-
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=500, detail=f"An error occurred while connecting to BDFare: {exc}")
+        raise HTTPException(status_code=500, detail=f"Error communicating with BDFare API: {exc}")
