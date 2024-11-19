@@ -22,7 +22,7 @@ from app.holidays_services.routes import holiday_router
 from app.insurance_services.routes import insurance_router
 from app.train_services.routes import train_router
 from app.flight_services.routes.flyhub.search import router as flyhub_search_router
-from app.flight_services.routes.bdfare.search import router as bdfare_search_router
+from app.flight_services.routes.bdfare import search as bdfare_search_router
 from app.flight_services.routes.combined import combined_search
 
 # Initialize FastAPI app
@@ -44,7 +44,7 @@ app.include_router(event_router, prefix="/events", tags=["Events"])
 app.include_router(holiday_router, prefix="/holidays", tags=["Holidays"])
 app.include_router(insurance_router, prefix="/insurance", tags=["Insurance"])
 app.include_router(train_router, prefix="/trains", tags=["Trains"])
-app.include_router(bdfare_search_router, prefix="/api/bdfare", tags=["Flights"])
+app.include_router(bdfare_search_router.router, prefix="/api/bdfare", tags=["Flights"])
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
 app.include_router(flyhub_search_router, prefix="/api/flyhub", tags=["Flights"])
 # Root endpoint
