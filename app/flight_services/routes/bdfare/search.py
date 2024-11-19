@@ -1,18 +1,13 @@
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Header
 import httpx
-import os
-from dotenv import load_dotenv
 import logging
-
-# Load .env file
-load_dotenv()
 
 # Initialize router
 router = APIRouter()
 
-# Load BDFare API details from environment variables
-BDFARE_BASE_URL = os.getenv("BDFARE_BASE_URL")
-BDFARE_API_KEY = os.getenv("BDFARE_API_KEY")
+# Directly embed BDFare API details
+BDFARE_BASE_URL = "https://bdf.centralindia.cloudapp.azure.com/api/enterprise"
+BDFARE_API_KEY = "Xm8yZms/ayM/Vm1UMTZZLUJ6Y2VlQDk1ZEZfJEtNLUdzUlF3WSUjQyo/JWd0aDZ5TmtzJnI0eXdBYyVRNz9DYQ=="
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +24,7 @@ async def search_flights(payload: dict):
     Returns:
         dict: The response from the BDFare API.
     """
+    # Validate BDFare configuration
     if not BDFARE_BASE_URL:
         logger.error("BDFare Base URL is missing.")
         raise HTTPException(status_code=500, detail="BDFare Base URL is not configured.")
