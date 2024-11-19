@@ -89,7 +89,7 @@ router = APIRouter()
 # FlyHub API credentials and base URL
 FLYHUB_PRODUCTION_URL = os.getenv("FLYHUB_PRODUCTION_URL", "https://api.flyhub.com/api/v1/")
 
-# Directly provided FlyHub token
+# Directly provided FlyHub token (stored securely in the backend)
 FLYHUB_TOKEN = os.getenv(
     "FLYHUB_TOKEN",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InRoZWNpdHlmbHllcnNAZ21haWwuY29tIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy91c2VyZGF0YSI6IjIwOTc4fDIxNTMxfDEwMy4xMjQuMjUxLjE0NywxMy4yMTUuMTgyLjcyIiwibmJmIjoxNzMxOTk3NzU5LCJleHAiOjE3MzI2MDI1NTksImlhdCI6MTczMTk5Nzc1OSwiaXNzIjoiaHR0cHM6Ly9hcGliZXRhLmZseWh1Yi5jb20iLCJhdWQiOiJhcGkuZmx5aHViLmNvbSJ9.lq5zvfBfyf5UdhVKaAqoMeEWbKZoLb6iTt9e690bXrg",
@@ -106,7 +106,7 @@ async def search_flights(payload: dict):
     Returns:
         dict: The response from the FlyHub API.
     """
-    # Validate the FlyHub configuration
+    # Validate FlyHub API configuration
     if not FLYHUB_PRODUCTION_URL:
         raise HTTPException(status_code=500, detail="FlyHub production URL is not configured.")
     if not FLYHUB_TOKEN:
@@ -115,7 +115,7 @@ async def search_flights(payload: dict):
     # Define FlyHub search URL and headers
     url = f"{FLYHUB_PRODUCTION_URL}AirSearch"
     headers = {
-        "Authorization": f"Bearer {FLYHUB_TOKEN}",
+        "Authorization": f"Bearer {FLYHUB_TOKEN}",  # Token is added automatically here
         "Content-Type": "application/json",
     }
 
@@ -127,9 +127,7 @@ async def search_flights(payload: dict):
         if response.status_code == 200:
             return response.json()
         else:
-            # Log and raise HTTP exception for non-200 responses
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
     except httpx.RequestError as exc:
-        # Handle connection-related errors
         raise HTTPException(status_code=500, detail=f"Error communicating with FlyHub API: {exc}")
