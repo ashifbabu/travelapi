@@ -44,7 +44,7 @@ app.include_router(event_router, prefix="/events", tags=["Events"])
 app.include_router(holiday_router, prefix="/holidays", tags=["Holidays"])
 app.include_router(insurance_router, prefix="/insurance", tags=["Insurance"])
 app.include_router(train_router, prefix="/trains", tags=["Trains"])
-app.include_router(bdfare_search_router, prefix="/api/bdfare", tags=["BDFare"])
+app.include_router(bdfare_search_router, prefix="/api/bdfare", tags=["Flights"])
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
 app.include_router(flyhub_search_router, prefix="/api/flyhub", tags=["Flights"])
 # Root endpoint
