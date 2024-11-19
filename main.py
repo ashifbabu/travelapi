@@ -1,4 +1,16 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
+import os
+
+# Load .env file
+load_dotenv()
+
+# Access environment variables (for example)
+APP_TITLE = os.getenv("APP_TITLE", "Travel API")
+APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+APP_DESCRIPTION = os.getenv("APP_DESCRIPTION", "API for flight and travel related services")
+
+# Import routers
 from app.flight_services.routes.flyhub.auth import router as flyhub_auth_endpoint
 from app.flight_services.routes.flyhub import balance as flyhub_balance_routes
 from app.flight_services.routes.bdfare import balance as bdfare_balance_routes
@@ -13,11 +25,12 @@ from app.flight_services.routes.flyhub import router as flyhub_router
 from app.flight_services.routes.bdfare import router as bdfare_router
 from app.flight_services.routes.combined import combined_search
 
+# Initialize FastAPI app
 app = FastAPI(
-    title="Travel API",
-    version="1.0.0",
+    title=APP_TITLE,
+    version=APP_VERSION,
     openapi_url="/openapi.json",
-    description="API for flight and travel related services"
+    description=APP_DESCRIPTION
 )
 
 # Include service routers with appropriate prefixes and tags
@@ -35,6 +48,7 @@ app.include_router(flyhub_router, prefix="/api", tags=["FlyHub"])
 app.include_router(bdfare_router, prefix="/api", tags=["BDFare"])
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Combined Search"])
 
+# Root endpoint
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Travel API!"}
