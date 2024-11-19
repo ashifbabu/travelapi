@@ -47,6 +47,8 @@ app.include_router(train_router, prefix="/trains", tags=["Trains"])
 app.include_router(bdfare_search_router.router, prefix="/api/bdfare", tags=["Flights"])
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
 app.include_router(flyhub_search_router, prefix="/api/flyhub", tags=["Flights"])
+
+
 # Root endpoint
 @app.get("/")
 def read_root():
