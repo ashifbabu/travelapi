@@ -148,12 +148,13 @@ async def authenticate_flyhub():
 
 def convert_bdfare_to_flyhub(payload):
     """Convert BDFare request format to FlyHub request format."""
+    trip_type = payload["request"]["shoppingCriteria"]["tripType"].lower()
     flyhub_payload = {
         "AdultQuantity": sum(1 for pax in payload["request"]["pax"] if pax["ptc"] == "ADT"),
         "ChildQuantity": sum(1 for pax in payload["request"]["pax"] if pax["ptc"] == "CHD"),
         "InfantQuantity": sum(1 for pax in payload["request"]["pax"] if pax["ptc"] == "INF"),
         "EndUserIp": "103.124.251.147",  # Replace with actual IP
-        "JourneyType": "1" if payload["request"]["shoppingCriteria"]["tripType"].lower() == "oneway" else "2",
+        "JourneyType": "1" if trip_type == "Oneway" else "2" if trip_type == "Return" else "3",  # '3' for circle trip
         "Segments": [
             {
                 "Origin": segment["originDepRequest"]["iatA_LocationCode"],
@@ -165,6 +166,7 @@ def convert_bdfare_to_flyhub(payload):
         ]
     }
     return flyhub_payload
+
 
 
 @router.post("/search")
