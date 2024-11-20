@@ -1,3 +1,5 @@
+import subprocess
+import json
 from fastapi import APIRouter, HTTPException, Depends
 import httpx
 import asyncio
@@ -17,22 +19,46 @@ cached_token = {"token": None, "expires_at": 0}
 
 
 async def fetch_bdfare_flights(payload):
-    """Call BDFare API for flight searching."""
+    """Call BDFare API for flight searching with curl fallback."""
     url = f"{BDFARE_BASE_URL}/AirShopping"
     headers = {"X-API-KEY": BDFARE_API_KEY, "Content-Type": "application/json"}
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload, headers=headers)
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
 
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise HTTPException(status_code=response.status_code, detail=response.text)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+    except Exception as e:
+        # Fallback to curl
+        payload_json = json.dumps(payload)
+        curl_command = [
+            "curl",
+            "-X", "POST",
+            url,
+            "-H", f"X-API-KEY: {BDFARE_API_KEY}",
+            "-H", "Content-Type: application/json",
+            "-d", payload_json
+        ]
+        result = subprocess.run(curl_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Curl command failed: {result.stderr}"
+            )
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to decode JSON response from curl: {result.stdout}"
+            )
 
 
 async def fetch_flyhub_flights(payload):
-    """Call FlyHub API for flight searching."""
-    # Ensure the token is available and not expired
+    """Call FlyHub API for flight searching with curl fallback."""
     global cached_token
     if not cached_token["token"] or cached_token["expires_at"] <= asyncio.get_event_loop().time():
         await authenticate_flyhub()
@@ -43,13 +69,38 @@ async def fetch_flyhub_flights(payload):
         "Content-Type": "application/json"
     }
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload, headers=headers)
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
 
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise HTTPException(status_code=response.status_code, detail=response.text)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+    except Exception as e:
+        # Fallback to curl
+        payload_json = json.dumps(payload)
+        curl_command = [
+            "curl",
+            "-X", "POST",
+            url,
+            "-H", f"Authorization: Bearer {cached_token['token']}",
+            "-H", "Content-Type: application/json",
+            "-d", payload_json
+        ]
+        result = subprocess.run(curl_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Curl command failed: {result.stderr}"
+            )
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to decode JSON response from curl: {result.stdout}"
+            )
 
 
 async def authenticate_flyhub():
@@ -58,15 +109,41 @@ async def authenticate_flyhub():
     url = f"{FLYHUB_BASE_URL}Authenticate"
     payload = {"username": FLYHUB_USERNAME, "apikey": FLYHUB_API_KEY}
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload)
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload)
 
-    if response.status_code == 200:
-        token_data = response.json()
-        cached_token["token"] = token_data["TokenId"]
-        cached_token["expires_at"] = asyncio.get_event_loop().time() + 3600  # Assume token validity is 1 hour
-    else:
-        raise HTTPException(status_code=response.status_code, detail="FlyHub Authentication Failed")
+        if response.status_code == 200:
+            token_data = response.json()
+            cached_token["token"] = token_data["TokenId"]
+            cached_token["expires_at"] = asyncio.get_event_loop().time() + 3600  # Assume token validity is 1 hour
+        else:
+            raise HTTPException(status_code=response.status_code, detail="FlyHub Authentication Failed")
+    except Exception as e:
+        # Fallback to curl for authentication
+        payload_json = json.dumps(payload)
+        curl_command = [
+            "curl",
+            "-X", "POST",
+            url,
+            "-H", "Content-Type: application/json",
+            "-d", payload_json
+        ]
+        result = subprocess.run(curl_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Curl command failed: {result.stderr}"
+            )
+        try:
+            token_data = json.loads(result.stdout)
+            cached_token["token"] = token_data["TokenId"]
+            cached_token["expires_at"] = asyncio.get_event_loop().time() + 3600
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to decode JSON response from curl: {result.stdout}"
+            )
 
 
 def convert_bdfare_to_flyhub(payload):
@@ -101,17 +178,14 @@ async def combined_search(payload: dict):
     Returns:
         dict: Combined flight results from BDFare and FlyHub.
     """
-    # Convert BDFare payload to FlyHub payload
     flyhub_payload = convert_bdfare_to_flyhub(payload)
 
     try:
-        # Call both APIs concurrently
         bdfare_task = fetch_bdfare_flights(payload)
         flyhub_task = fetch_flyhub_flights(flyhub_payload)
 
         bdfare_response, flyhub_response = await asyncio.gather(bdfare_task, flyhub_task)
 
-        # Combine the responses
         combined_results = {
             "bdfare": bdfare_response,
             "flyhub": flyhub_response

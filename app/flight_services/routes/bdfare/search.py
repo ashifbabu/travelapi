@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Header, Depends
-import httpx
+from fastapi import APIRouter, HTTPException
 import os
+import subprocess
+import json
 from dotenv import load_dotenv
 import logging
-
+import httpx
 # Load .env file
 load_dotenv()
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 @router.post("/airshopping")
 async def search_flights(payload: dict):
     """
-    Search and retrieve flight results using BDFare API.
+    Search and retrieve flight results using BDFare API, with a curl fallback.
 
     Args:
         payload (dict): The flight search request payload.
@@ -45,11 +46,11 @@ async def search_flights(payload: dict):
     logger.info(f"Making request to BDFare API: {url}")
     logger.debug(f"Payload: {payload}")
 
+    # Attempt using httpx
     try:
-        # Make the flight search request
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
-
+        
         logger.info(f"BDFare API responded with status code: {response.status_code}")
 
         if response.status_code == 200:
@@ -63,7 +64,49 @@ async def search_flights(payload: dict):
             )
 
     except httpx.RequestError as exc:
-        logger.exception(f"Error communicating with BDFare API: {exc}")
-        raise HTTPException(
-            status_code=500, detail=f"Error communicating with BDFare API: {str(exc)}"
-        )
+        logger.exception(f"Error communicating with BDFare API using httpx: {exc}")
+        logger.info("Falling back to curl...")
+
+        # Use curl as a fallback
+        try:
+            # Convert payload to JSON string for curl
+            payload_json = json.dumps(payload)
+
+            # Construct the curl command
+            curl_command = [
+                "curl",
+                "-X", "POST",
+                url,
+                "-H", f"X-API-KEY: {BDFARE_API_KEY}",
+                "-H", "Content-Type: application/json",
+                "-d", payload_json
+            ]
+
+            # Execute the curl command
+            result = subprocess.run(curl_command, capture_output=True, text=True)
+
+            # Check for errors
+            if result.returncode != 0:
+                logger.error(f"Curl command failed: {result.stderr}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Curl command failed: {result.stderr}"
+                )
+
+            # Parse and return the JSON response
+            response_json = json.loads(result.stdout)
+            logger.debug(f"Curl Response: {response_json}")
+            return response_json
+
+        except json.JSONDecodeError:
+            logger.error(f"Failed to decode JSON response from curl: {result.stdout}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to decode JSON response: {result.stdout}"
+            )
+        except Exception as e:
+            logger.exception(f"Unexpected error occurred using curl: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Unexpected error occurred using curl: {str(e)}"
+            )
