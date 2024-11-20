@@ -31,8 +31,13 @@ jobs:
           # Navigate to the project directory
           cd /home/ubuntu/travelapi
 
-          # Pull the latest changes
-          git pull origin main
+          # Ensure the repository is clean before pulling changes
+          git reset --hard
+          git clean -fd
+
+          # Pull the latest changes and handle divergent branches
+          git fetch origin main
+          git merge --strategy-option=theirs origin/main || git pull origin main --rebase || git pull origin main --merge
 
           # Activate the virtual environment and install dependencies
           source venv/bin/activate
