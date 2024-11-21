@@ -1,10 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
 import os
 import subprocess
 import json
 from dotenv import load_dotenv
 import logging
 import httpx
+
 # Load .env file
 load_dotenv()
 
@@ -19,16 +22,90 @@ BDFARE_API_KEY = os.getenv("BDFARE_API_KEY")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@router.post("/airshopping")
-async def search_flights(payload: dict):
+# Define Pydantic models for request and response
+class TravelPreferences(BaseModel):
+    vendorPref: List[str] = Field(default=[])
+    cabinCode: str = Field(default="Economy")
+
+
+class OriginDepRequest(BaseModel):
+    iatA_LocationCode: str = Field(example="JSR")
+    date: str = Field(example="2024-12-15")
+
+
+class DestArrivalRequest(BaseModel):
+    iatA_LocationCode: str = Field(example="DAC")
+
+
+class OriginDest(BaseModel):
+    originDepRequest: OriginDepRequest
+    destArrivalRequest: DestArrivalRequest
+
+
+class Pax(BaseModel):
+    paxID: str = Field(example="PAX1")
+    ptc: str = Field(example="ADT")  # Passenger type code: ADT (adult), CHD (child), INF (infant)
+
+
+class ShoppingCriteria(BaseModel):
+    tripType: str = Field(default="Oneway", example="Oneway")
+    travelPreferences: TravelPreferences
+    returnUPSellInfo: bool = Field(default=True)
+
+
+class AirShoppingRequest(BaseModel):
+    pointOfSale: str = Field(default="BD", example="BD")
+    request: Dict[str, Any] = Field(
+        example={
+            "originDest": [
+                {
+                    "originDepRequest": {
+                        "iatA_LocationCode": "JSR",
+                        "date": "2024-12-15"
+                    },
+                    "destArrivalRequest": {
+                        "iatA_LocationCode": "DAC"
+                    }
+                }
+            ],
+            "pax": [
+                {
+                    "paxID": "PAX1",
+                    "ptc": "ADT"
+                }
+            ],
+            "shoppingCriteria": {
+                "tripType": "Oneway",
+                "travelPreferences": {
+                    "vendorPref": [],
+                    "cabinCode": "Economy"
+                },
+                "returnUPSellInfo": True
+            }
+        }
+    )
+
+
+class AirShoppingResponse(BaseModel):
+    success: bool
+    data: Dict[str, Any]
+
+
+@router.post(
+    "/airshopping",
+    response_model=AirShoppingResponse,
+    summary="Search Flights",
+    description="Search and retrieve flight results using the BDFare API, with a fallback to curl.",
+)
+async def search_flights(payload: AirShoppingRequest):
     """
     Search and retrieve flight results using BDFare API, with a curl fallback.
 
     Args:
-        payload (dict): The flight search request payload.
+        payload (AirShoppingRequest): The flight search request payload.
 
     Returns:
-        dict: The response from the BDFare API.
+        AirShoppingResponse: The response from the BDFare API.
     """
     if not BDFARE_BASE_URL:
         logger.error("BDFare Base URL is missing.")
@@ -44,18 +121,19 @@ async def search_flights(payload: dict):
     }
 
     logger.info(f"Making request to BDFare API: {url}")
-    logger.debug(f"Payload: {payload}")
+    logger.debug(f"Payload: {payload.dict()}")
 
     # Attempt using httpx
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=headers)
+            response = await client.post(url, json=payload.dict(), headers=headers)
         
         logger.info(f"BDFare API responded with status code: {response.status_code}")
 
         if response.status_code == 200:
-            logger.debug(f"Response: {response.json()}")
-            return response.json()
+            response_data = response.json()
+            logger.debug(f"Response: {response_data}")
+            return AirShoppingResponse(success=True, data=response_data)
         else:
             logger.error(f"Error response from BDFare API: {response.text}")
             raise HTTPException(
@@ -70,7 +148,7 @@ async def search_flights(payload: dict):
         # Use curl as a fallback
         try:
             # Convert payload to JSON string for curl
-            payload_json = json.dumps(payload)
+            payload_json = json.dumps(payload.dict())
 
             # Construct the curl command
             curl_command = [
@@ -96,7 +174,7 @@ async def search_flights(payload: dict):
             # Parse and return the JSON response
             response_json = json.loads(result.stdout)
             logger.debug(f"Curl Response: {response_json}")
-            return response_json
+            return AirShoppingResponse(success=True, data=response_json)
 
         except json.JSONDecodeError:
             logger.error(f"Failed to decode JSON response from curl: {result.stdout}")

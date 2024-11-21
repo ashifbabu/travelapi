@@ -1,8 +1,10 @@
 import subprocess
 import json
-from fastapi import APIRouter, HTTPException
-import httpx
 import time
+from fastapi import APIRouter, HTTPException, Body
+from pydantic import BaseModel, Field
+from typing import List
+import httpx
 
 router = APIRouter()
 
@@ -15,8 +17,24 @@ FLYHUB_AIRSEARCH_URL = "https://api.flyhub.com/api/v1/AirSearch"
 # Token cache
 cached_token = {"token": None, "expires_at": 0}
 
+# Pydantic models for request and response validation
+class Segment(BaseModel):
+    Origin: str = Field(..., example="DAC")
+    Destination: str = Field(..., example="CCU")
+    CabinClass: str = Field(..., example="1")  # 1 for Economy, 2 for Business
+    DepartureDateTime: str = Field(..., example="2024-12-27")  # Format: YYYY-MM-DD
 
-async def get_flyhub_token():
+
+class FlightSearchRequest(BaseModel):
+    AdultQuantity: int = Field(..., example=1)
+    ChildQuantity: int = Field(..., example=0)
+    InfantQuantity: int = Field(..., example=0)
+    EndUserIp: str = Field(..., example="103.124.251.147")
+    JourneyType: str = Field(..., example="1")  # 1 for Oneway, 2 for Return
+    Segments: List[Segment]
+
+
+async def get_flyhub_token() -> str:
     """
     Authenticate with the FlyHub API to get a Bearer token.
     Returns:
@@ -42,17 +60,23 @@ async def get_flyhub_token():
             cached_token["expires_at"] = current_time + (7 * 24 * 3600)  # Token valid for 7 days
             return cached_token["token"]
         else:
-            raise HTTPException(status_code=response.status_code, detail="Authentication failed. Check your credentials.")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Authentication failed: {response.json().get('message', 'Unknown error')}"
+            )
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=500, detail=f"Error communicating with FlyHub API for authentication: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error communicating with FlyHub API for authentication: {exc}"
+        )
 
 
-@router.post("/search")
-async def search_flights(payload: dict):
+@router.post("/search", summary="Search Flights")
+async def search_flights(payload: FlightSearchRequest = Body(...)):
     """
     Search flights using the FlyHub API via curl.
     Args:
-        payload (dict): The flight search request payload.
+        payload (FlightSearchRequest): The flight search request payload.
     Returns:
         dict: The response from the FlyHub API.
     """
@@ -60,7 +84,7 @@ async def search_flights(payload: dict):
     token = await get_flyhub_token()
 
     # Convert payload to JSON string for curl
-    payload_json = json.dumps(payload)
+    payload_json = payload.json()
 
     # Construct the curl command
     curl_command = [
