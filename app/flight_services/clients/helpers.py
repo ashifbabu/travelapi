@@ -31,141 +31,171 @@ def simplify_bdfare_response(bdfare_response):
     simplified_offers = []
     airport_name_cache = {}  # Cache for airport names to avoid redundant API calls
 
-    for offer_group in bdfare_response.get('response', {}).get('offersGroup', []):
-        offer = offer_group.get('offer', {})
+    response = bdfare_response.get('response', {})
+    offers_group = response.get('offersGroup')
+    special_return_offers_group = response.get('specialReturnOffersGroup')
 
-        # Initialize simplified offer structure
-        simplified_offer = {
-            'id': offer.get('offerId'),
-            'airline': offer.get('validatingCarrier'),
-            'airlineName': offer.get('paxSegmentList', [{}])[0].get('paxSegment', {}).get('marketingCarrierInfo', {}).get('carrierName', None),
-            'refundable': offer.get('refundable'),
-            'fareType': offer.get('fareType'),
-            'price': {},
-            'segments': [],
-            'baggageAllowance': [],
-            'seatsRemaining': offer.get('seatsRemaining'),
-        }
+    if offers_group:
+        # Handle one-way flights
+        offers = offers_group
+        # Assuming offers_group is a list of offers
+        offers_list = offers.get('offer', []) if isinstance(offers.get('offer', {}), list) else [offers.get('offer', {})]
+        for offer in offers_list:
+            simplified_offer = process_offer(offer, airport_name_cache)
+            simplified_offers.append(simplified_offer)
+    elif special_return_offers_group:
+        # Handle return flights
+        ob_offers = special_return_offers_group.get('ob', [])
+        ib_offers = special_return_offers_group.get('ib', [])
 
-        # Process segments
-        for pax_segment in offer.get('paxSegmentList', []):
-            segment = pax_segment.get('paxSegment', {})
-            departure_info = segment.get('departure', {})
-            arrival_info = segment.get('arrival', {})
+        # Combine each outbound offer with each inbound offer
+        for ob_offer_wrapper in ob_offers:
+            ob_offer = ob_offer_wrapper.get('offer', {})
+            simplified_ob_offer = process_offer(ob_offer, airport_name_cache, journey_type='Outbound')
 
-            # Get from and to IATA codes
-            from_iata = departure_info.get('iatA_LocationCode')
-            to_iata = arrival_info.get('iatA_LocationCode')
+            for ib_offer_wrapper in ib_offers:
+                ib_offer = ib_offer_wrapper.get('offer', {})
+                simplified_ib_offer = process_offer(ib_offer, airport_name_cache, journey_type='Inbound')
 
-            # Get airport names, use cache to avoid redundant API calls
-            # Fetch 'fromAirportName'
-            from_airport_name = departure_info.get('airportName')
-            if not from_airport_name:
-                if from_iata in airport_name_cache:
-                    from_airport_name = airport_name_cache[from_iata]
-                else:
-                    # Fetch from API
-                    try:
-                        response = requests.get(f'https://port-api.com/port/code/{from_iata}', headers={'accept': 'application/json'})
-                        if response.status_code == 200:
-                            data = response.json()
-                            if data['features']:
-                                from_airport_name = data['features'][0]['properties']['name']
-                                airport_name_cache[from_iata] = from_airport_name
-                            else:
-                                from_airport_name = "Unknown Departure Airport"
-                                airport_name_cache[from_iata] = from_airport_name
-                        else:
-                            from_airport_name = "Unknown Departure Airport"
-                    except Exception:
-                        from_airport_name = "Unknown Departure Airport"
-
-            # Fetch 'toAirportName'
-            to_airport_name = arrival_info.get('airportName')
-            if not to_airport_name:
-                if to_iata in airport_name_cache:
-                    to_airport_name = airport_name_cache[to_iata]
-                else:
-                    # Fetch from API
-                    try:
-                        response = requests.get(f'https://port-api.com/port/code/{to_iata}', headers={'accept': 'application/json'})
-                        if response.status_code == 200:
-                            data = response.json()
-                            if data['features']:
-                                to_airport_name = data['features'][0]['properties']['name']
-                                airport_name_cache[to_iata] = to_airport_name
-                            else:
-                                to_airport_name = "Unknown Arrival Airport"
-                                airport_name_cache[to_iata] = to_airport_name
-                        else:
-                            to_airport_name = "Unknown Arrival Airport"
-                    except Exception:
-                        to_airport_name = "Unknown Arrival Airport"
-
-            simplified_segment = {
-                'from': from_iata,
-                'fromAirportName': from_airport_name,
-                'to': to_iata,
-                'toAirportName': to_airport_name,
-                'departureTime': departure_info.get('aircraftScheduledDateTime'),
-                'arrivalTime': arrival_info.get('aircraftScheduledDateTime'),
-                'airlineCode': segment.get('marketingCarrierInfo', {}).get('carrierDesigCode'),
-                'airlineName': segment.get('marketingCarrierInfo', {}).get('carrierName'),  # Airline name for the segment
-                'flightNumber': segment.get('flightNumber'),
-                'cabinClass': segment.get('cabinType'),
-                'durationMinutes': segment.get('duration'),
-            }
-            simplified_offer['segments'].append(simplified_segment)
-
-        # Process fare details
-        total_base_fare = 0
-        total_tax = 0
-        total_discount = 0
-        currency = 'BDT'
-        for fare_detail_item in offer.get('fareDetailList', []):
-            fare_detail = fare_detail_item.get('fareDetail', {})
-            total_base_fare += fare_detail.get('baseFare', 0)
-            total_tax += fare_detail.get('tax', 0)
-            total_discount += fare_detail.get('discount', 0)
-            currency = fare_detail.get('currency', 'BDT')
-
-        # Calculate total price
-        total_price = total_base_fare + total_tax - total_discount
-        simplified_offer['price'] = {
-            'baseFare': total_base_fare,
-            'tax': total_tax,
-            'discount': total_discount,
-            'total': total_price,
-            'currency': currency,
-        }
-
-        # Process baggage allowance
-        for baggage_item in offer.get('baggageAllowanceList', []):
-            baggage = baggage_item.get('baggageAllowance', {})
-            simplified_baggage = {
-                'from': baggage.get('departure'),
-                'to': baggage.get('arrival'),
-                'checkIn': [
-                    {
-                        'paxType': check_in.get('paxType'),
-                        'allowance': check_in.get('allowance')
-                    }
-                    for check_in in baggage.get('checkIn', [])
-                ],
-                'cabin': [
-                    {
-                        'paxType': cabin.get('paxType'),
-                        'allowance': cabin.get('allowance')
-                    }
-                    for cabin in baggage.get('cabin', [])
-                ],
-            }
-            simplified_offer['baggageAllowance'].append(simplified_baggage)
-
-        # Append to simplified offers
-        simplified_offers.append(simplified_offer)
+                # Combine outbound and inbound offers into a single offer
+                combined_offer = {
+                    'id': f"{simplified_ob_offer['id']}_{simplified_ib_offer['id']}",
+                    'airline': simplified_ob_offer['airline'],
+                    'airlineName': simplified_ob_offer['airlineName'],
+                    'refundable': simplified_ob_offer['refundable'] and simplified_ib_offer['refundable'],
+                    'fareType': simplified_ob_offer['fareType'],
+                    'price': {
+                        'baseFare': simplified_ob_offer['price']['baseFare'] + simplified_ib_offer['price']['baseFare'],
+                        'tax': simplified_ob_offer['price']['tax'] + simplified_ib_offer['price']['tax'],
+                        'discount': simplified_ob_offer['price']['discount'] + simplified_ib_offer['price']['discount'],
+                        'total': simplified_ob_offer['price']['total'] + simplified_ib_offer['price']['total'],
+                        'currency': simplified_ob_offer['price']['currency'],
+                    },
+                    'segments': simplified_ob_offer['segments'] + simplified_ib_offer['segments'],
+                    'baggageAllowance': simplified_ob_offer['baggageAllowance'] + simplified_ib_offer['baggageAllowance'],
+                    'seatsRemaining': min(simplified_ob_offer['seatsRemaining'], simplified_ib_offer['seatsRemaining']),
+                }
+                simplified_offers.append(combined_offer)
+    else:
+        # No offers found
+        pass
 
     return simplified_offers
+
+def process_offer(offer, airport_name_cache, journey_type=''):
+    """Process a single offer into simplified format."""
+    # Initialize simplified offer structure
+    simplified_offer = {
+        'id': offer.get('offerId'),
+        'airline': offer.get('validatingCarrier'),
+        'airlineName': offer.get('paxSegmentList', [{}])[0].get('paxSegment', {}).get('marketingCarrierInfo', {}).get('carrierName', None),
+        'refundable': offer.get('refundable'),
+        'fareType': offer.get('fareType'),
+        'price': {},
+        'segments': [],
+        'baggageAllowance': [],
+        'seatsRemaining': int(offer.get('seatsRemaining', '0')),
+    }
+
+    # Process segments
+    for pax_segment_item in offer.get('paxSegmentList', []):
+        pax_segment = pax_segment_item.get('paxSegment', {})
+        departure_info = pax_segment.get('departure', {})
+        arrival_info = pax_segment.get('arrival', {})
+
+        # Get from and to IATA codes
+        from_iata = departure_info.get('iatA_LocationCode')
+        to_iata = arrival_info.get('iatA_LocationCode')
+
+        # Get airport names, use cache to avoid redundant API calls
+        from_airport_name = departure_info.get('airportName') or get_airport_name(from_iata, airport_name_cache)
+        to_airport_name = arrival_info.get('airportName') or get_airport_name(to_iata, airport_name_cache)
+
+        simplified_segment = {
+            'from': from_iata,
+            'fromAirportName': from_airport_name,
+            'to': to_iata,
+            'toAirportName': to_airport_name,
+            'departureTime': departure_info.get('aircraftScheduledDateTime'),
+            'arrivalTime': arrival_info.get('aircraftScheduledDateTime'),
+            'airlineCode': pax_segment.get('marketingCarrierInfo', {}).get('carrierDesigCode'),
+            'airlineName': pax_segment.get('marketingCarrierInfo', {}).get('carrierName'),
+            'flightNumber': pax_segment.get('flightNumber'),
+            'cabinClass': pax_segment.get('cabinType'),
+            'durationMinutes': pax_segment.get('duration'),
+            'journeyType': journey_type,
+        }
+        simplified_offer['segments'].append(simplified_segment)
+
+    # Process fare details
+    total_base_fare = 0
+    total_tax = 0
+    total_discount = 0
+    currency = 'BDT'
+    for fare_detail_item in offer.get('fareDetailList', []):
+        fare_detail = fare_detail_item.get('fareDetail', {})
+        total_base_fare += fare_detail.get('baseFare', 0)
+        total_tax += fare_detail.get('tax', 0)
+        total_discount += fare_detail.get('discount', 0)
+        currency = fare_detail.get('currency', 'BDT')
+
+    # Calculate total price
+    total_price = total_base_fare + total_tax - total_discount
+    simplified_offer['price'] = {
+        'baseFare': total_base_fare,
+        'tax': total_tax,
+        'discount': total_discount,
+        'total': total_price,
+        'currency': currency,
+    }
+
+    # Process baggage allowance
+    for baggage_item in offer.get('baggageAllowanceList', []):
+        baggage = baggage_item.get('baggageAllowance', {})
+        simplified_baggage = {
+            'from': baggage.get('departure'),
+            'to': baggage.get('arrival'),
+            'checkIn': [
+                {
+                    'paxType': check_in.get('paxType'),
+                    'allowance': check_in.get('allowance')
+                }
+                for check_in in baggage.get('checkIn', [])
+            ],
+            'cabin': [
+                {
+                    'paxType': cabin.get('paxType'),
+                    'allowance': cabin.get('allowance')
+                }
+                for cabin in baggage.get('cabin', [])
+            ],
+        }
+        simplified_offer['baggageAllowance'].append(simplified_baggage)
+
+    return simplified_offer
+
+def get_airport_name(iata_code, airport_name_cache):
+    """Fetch airport name using IATA code with caching."""
+    if iata_code in airport_name_cache:
+        return airport_name_cache[iata_code]
+    else:
+        # Fetch from API
+        try:
+            response = requests.get(f'https://port-api.com/port/code/{iata_code}', headers={'accept': 'application/json'})
+            if response.status_code == 200:
+                data = response.json()
+                if data['features']:
+                    airport_name = data['features'][0]['properties']['name']
+                    airport_name_cache[iata_code] = airport_name
+                    return airport_name
+                else:
+                    airport_name = "Unknown Airport"
+                    airport_name_cache[iata_code] = airport_name
+                    return airport_name
+            else:
+                return "Unknown Airport"
+        except Exception:
+            return "Unknown Airport"
 
 
 
