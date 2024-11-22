@@ -37,10 +37,9 @@ def simplify_bdfare_response(bdfare_response):
 
     if offers_group:
         # Handle one-way flights
-        offers = offers_group
-        # Assuming offers_group is a list of offers
-        offers_list = offers.get('offer', []) if isinstance(offers.get('offer', {}), list) else [offers.get('offer', {})]
-        for offer in offers_list:
+        offers_list = offers_group
+        for offer_wrapper in offers_list:
+            offer = offer_wrapper.get('offer', {})
             simplified_offer = process_offer(offer, airport_name_cache)
             simplified_offers.append(simplified_offer)
     elif special_return_offers_group:
