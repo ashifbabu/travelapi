@@ -9,7 +9,7 @@ from app.flight_services.clients.fetchers import fetch_bdfare_flights, fetch_fly
 from app.flight_services.models.combined.combined_search import RequestPayload
 
 router = APIRouter()
-
+# test
 @router.post("/search")
 async def combined_search(payload: RequestPayload = Body(...)):
     """
