@@ -95,11 +95,11 @@ class AirShoppingResponse(BaseModel):
     "/airshopping",
     response_model=AirShoppingResponse,
     summary="Search Flights",
-    description="Search and retrieve flight results using the BDFare API, with a fallback to curl.",
+    description="Search and retrieve flight results using the BDFare API.",
 )
 async def search_flights(payload: AirShoppingRequest):
     """
-    Search and retrieve flight results using BDFare API, with a curl fallback.
+    Search and retrieve flight results using BDFare API with curl.
 
     Args:
         payload (AirShoppingRequest): The flight search request payload.
@@ -115,76 +115,53 @@ async def search_flights(payload: AirShoppingRequest):
         raise HTTPException(status_code=500, detail="BDFare API key is not configured.")
 
     url = f"{BDFARE_BASE_URL}/AirShopping"
-    headers = {
-        "X-API-KEY": BDFARE_API_KEY,
-        "Content-Type": "application/json",
-    }
+    headers = [
+        "Content-Type: application/json",
+        f"X-API-KEY: {BDFARE_API_KEY}"
+    ]
 
-    logger.info(f"Making request to BDFare API: {url}")
-    logger.debug(f"Payload: {payload.dict()}")
+    # Convert payload to JSON string
+    payload_json = json.dumps(payload.dict())
 
-    # Attempt using httpx
+    # Construct the curl command
+    curl_command = [
+        "curl",
+        "-X", "POST",
+        url,
+        "-H", headers[0],  # Content-Type
+        "-H", headers[1],  # X-API-KEY
+        "-d", payload_json  # Data payload
+    ]
+
+    logger.info(f"Executing curl command: {' '.join(curl_command)}")
+
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload.dict(), headers=headers)
-        
-        logger.info(f"BDFare API responded with status code: {response.status_code}")
+        # Execute the curl command
+        result = subprocess.run(curl_command, capture_output=True, text=True)
 
-        if response.status_code == 200:
-            response_data = response.json()
-            logger.debug(f"Response: {response_data}")
-            return AirShoppingResponse(success=True, data=response_data)
-        else:
-            logger.error(f"Error response from BDFare API: {response.text}")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"BDFare API error: {response.text}",
-            )
-
-    except httpx.RequestError as exc:
-        logger.exception(f"Error communicating with BDFare API using httpx: {exc}")
-        logger.info("Falling back to curl...")
-
-        # Use curl as a fallback
-        try:
-            # Convert payload to JSON string for curl
-            payload_json = json.dumps(payload.dict())
-
-            # Construct the curl command
-            curl_command = [
-                "curl",
-                "-X", "POST",
-                url,
-                "-H", f"X-API-KEY: {BDFARE_API_KEY}",
-                "-H", "Content-Type: application/json",
-                "-d", payload_json
-            ]
-
-            # Execute the curl command
-            result = subprocess.run(curl_command, capture_output=True, text=True)
-
-            # Check for errors
-            if result.returncode != 0:
-                logger.error(f"Curl command failed: {result.stderr}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Curl command failed: {result.stderr}"
-                )
-
-            # Parse and return the JSON response
-            response_json = json.loads(result.stdout)
-            logger.debug(f"Curl Response: {response_json}")
-            return AirShoppingResponse(success=True, data=response_json)
-
-        except json.JSONDecodeError:
-            logger.error(f"Failed to decode JSON response from curl: {result.stdout}")
+        # Check for errors
+        if result.returncode != 0:
+            logger.error(f"Curl command failed: {result.stderr}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to decode JSON response: {result.stdout}"
+                detail=f"Curl command failed: {result.stderr}"
             )
-        except Exception as e:
-            logger.exception(f"Unexpected error occurred using curl: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Unexpected error occurred using curl: {str(e)}"
-            )
+
+        # Parse the response JSON
+        response_data = json.loads(result.stdout)
+        logger.debug(f"Curl Response: {response_data}")
+
+        return AirShoppingResponse(success=True, data=response_data)
+
+    except json.JSONDecodeError:
+        logger.error(f"Failed to decode JSON response from curl: {result.stdout}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to decode JSON response: {result.stdout}"
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error occurred using curl: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error occurred using curl: {str(e)}"
+        )
