@@ -27,6 +27,7 @@ from app.flight_services.routes.bdfare import offerPrice as bdfare_offerPrice_ro
 from app.flight_services.routes.bdfare import miniRule as bdfare_miniRule_router
 from app.flight_services.routes.bdfare import fareRules as bdfare_fareRules_router
 from app.flight_services.routes.bdfare import airPreBook as bdfare_airPreBook_router
+from app.flight_services.routes.bdfare import airbook as bdfare_airbook_router
 from app.flight_services.routes.combined import combined_search
 #test this is a test line added
 # Initialize FastAPI app
@@ -53,6 +54,7 @@ app.include_router(bdfare_offerPrice_router.router, prefix="/api/bdfare", tags=[
 app.include_router(bdfare_miniRule_router.router, prefix="/api/bdfare", tags=["Flights"])
 app.include_router(bdfare_fareRules_router.router, prefix="/api/bdfare", tags=["Flights"])
 app.include_router(bdfare_airPreBook_router.router, prefix="/api/bdfare", tags=["Flights"])
+app.include_router(bdfare_airbook_router.router, prefix="/api/bdfare", tags=["Flights"])
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
 app.include_router(flyhub_search_router, prefix="/api/flyhub", tags=["Flights"])
 
