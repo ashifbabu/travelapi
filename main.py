@@ -61,3 +61,8 @@ app.include_router(flyhub_search_router, prefix="/api/flyhub", tags=["Flights"])
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Travel API!"}
+
+
+@app.head("/")
+async def read_root_head():
+    return {"message": "Welcome to the Travel API!"}
