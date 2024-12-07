@@ -77,7 +77,7 @@ def get_flyhub_token() -> str:
             status_code=500,
             detail=f"An unexpected error occurred during FlyHub Authentication: {str(e)}",
         )
-
+#updated
 async def fetch_flyhub_airprice(search_id: str, result_id: str):
     """
     Fetch air pricing details from FlyHub API.
