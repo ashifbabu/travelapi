@@ -1,3 +1,4 @@
+#\flight_services\adapters\bdfare_adapter.py
 from typing import Dict, Any
 import logging
 from app.flight_services.models.combined.combined_search import (
@@ -6,7 +7,7 @@ from app.flight_services.models.combined.combined_search import (
     PriceDetails,
     BaggageDetails,
 )
-
+6
 # Logger setup
 logger = logging.getLogger("payload_conversion")
 logger.setLevel(logging.INFO)
@@ -87,6 +88,35 @@ def convert_bdfare_to_flyhub(payload: Dict[str, Any]) -> Dict[str, Any]:
         ]
     }
 
+def convert_to_bdfare_payload(source, trace_id, offer_ids):
+    """
+    Converts input data to the actual request payload format for BDFare.
+    
+    Args:
+        source (str): The source system, e.g., "bdfare".
+        trace_id (str): The trace ID for the request.
+        offer_ids (list): A list of offer IDs.
+        
+    Returns:
+        dict: The formatted payload for BDFare.
+    """
+    if source != "bdfare":
+        raise ValueError("Invalid source! This function only supports 'bdfare'.")
+    
+    # Create the payload in the required format
+    payload = {
+        "traceId": trace_id,
+        "offerId": offer_ids
+    }
+    return payload
+
+# Example usage
+source = "bdfare"
+trace_id = "2480d029-02c0-48e2-8d9a-dfe859ceb49a"
+offer_ids = ["7e3edac9-33f6-4db9-a5b5-53662072270c"]
+
+bdfare_payload = convert_to_bdfare_payload(source, trace_id, offer_ids)
+print(bdfare_payload)
 
 
 def simplify_bdfare_response(bdfare_response: dict) -> list[FlightSegment]:

@@ -1,12 +1,14 @@
+
+#app\flight_services\services\combined_service.py
 from app.flight_services.clients.bdfare_client import fetch_bdfare_flights
 from app.flight_services.clients.flyhub_client import fetch_flyhub_flights
 from app.flight_services.adapters.flyhub_adapter import convert_bdfare_to_flyhub
 from fastapi import HTTPException
 import asyncio
 import logging
+import os
 
 logger = logging.getLogger("combined_service")
-
 
 async def combined_search(payload):
     """
@@ -39,7 +41,7 @@ async def combined_search(payload):
         # Enrich request data
         enriched_request_data = {
             "pointOfSale": point_of_sale,
-            "request": request_data,  # Preserve the entire 'request' structure
+            "request": request_data,
         }
         logger.info(f"Enriched request data for processing: {enriched_request_data}")
 

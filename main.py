@@ -2,17 +2,52 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from app.flight_services.routes.combined import combined_search
+from app.flight_services.routes.rules import router as rules_router
+from app.flight_services.routes.airprice.airprice_routes import router as airprice_router  # Import airprice routes
 import logging
+from starlette.middleware.cors import CORSMiddleware
 
-# Initialize FastAPI app and logger
-app = FastAPI()
+# Initialize FastAPI app
+app = FastAPI(
+    title="Travel Services API",
+    description="API for flight services, rules, and air pricing",
+    version="1.0.0",
+    docs_url="/docs",  # Custom documentation URL
+    redoc_url="/redoc",  # Custom ReDoc URL
+)
+
+# Configure logging
 logger = logging.getLogger("main")
 logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace '*' with specific domains in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Register routes
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
+app.include_router(rules_router, prefix="/api/rules", tags=["Rules"])
+app.include_router(airprice_router, prefix="/api/airprice", tags=["AirPrice"])  # Register airprice routes
 
-# Add global exception handler for request validation errors
+# Health check endpoint
+@app.get("/", tags=["Health"])
+async def health_check():
+    """
+    Health check endpoint to verify the service is running.
+    """
+    logger.info("Health check endpoint accessed.")
+    return {"status": "ok", "message": "Service is running"}
+
+# Global exception handler for request validation errors
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """
@@ -27,6 +62,35 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
+# Global exception handler for unexpected errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Custom handler for all uncaught exceptions.
+    """
+    logger.error("Unexpected error occurred: %s", exc)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "message": "An unexpected error occurred. Please try again later.",
+        },
+    )
+
+# Event handlers for startup and shutdown
+@app.on_event("startup")
+async def startup_event():
+    """
+    Actions to perform during the startup phase.
+    """
+    logger.info("Starting Travel Services API...")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Actions to perform during the shutdown phase.
+    """
+    logger.info("Shutting down Travel Services API...")
 
 # from fastapi import FastAPI
 # from dotenv import load_dotenv

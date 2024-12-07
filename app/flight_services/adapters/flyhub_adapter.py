@@ -1,3 +1,4 @@
+#app\flight_services\adapters\flyhub_adapter.py
 from typing import Dict, Any
 from app.flight_services.models.combined.combined_search import (
     FlightSearchResponse,
