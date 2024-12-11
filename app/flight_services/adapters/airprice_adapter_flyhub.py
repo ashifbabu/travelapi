@@ -1,6 +1,7 @@
 from app.flight_services.models.airprice.airprice_response import AirPriceResponse, AirPriceDetails, AirPriceSegment
 
 
+
 def convert_bdfare_to_flyhub_airprice_request(payload: dict) -> dict:
     """
     Convert a BDFare-compatible AirPrice request payload to FlyHub-compatible payload.

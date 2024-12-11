@@ -16,7 +16,7 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-@router.post("/search", tags=["Combined Search"])
+@router.post("/search", )
 async def search_flights(payload: FlightSearchRequest = Body(...)):
     """
     Perform a combined flight search based on the specified source.

@@ -3,14 +3,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from app.flight_services.routes.combined import combined_search
 from app.flight_services.routes.rules import router as rules_router
-from app.flight_services.routes.airprice.airprice_routes import router as airprice_router  # Import airprice routes
+from app.flight_services.routes.airprice.airprice_routes import router as airprice_router  # AirPrice routes
+from app.flight_services.routes.airprebook.airprebook_routes import router as airprebook_router  # AirPreBook routes
 import logging
 from starlette.middleware.cors import CORSMiddleware
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Travel Services API",
-    description="API for flight services, rules, and air pricing",
+    description="API for flight services, rules, air pricing, and prebooking",
     version="1.0.0",
     docs_url="/docs",  # Custom documentation URL
     redoc_url="/redoc",  # Custom ReDoc URL
@@ -36,7 +37,8 @@ app.add_middleware(
 # Register routes
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
 app.include_router(rules_router, prefix="/api/rules", tags=["Rules"])
-app.include_router(airprice_router, prefix="/api/airprice", tags=["AirPrice"])  # Register airprice routes
+app.include_router(airprice_router, prefix="/api/airprice", tags=["AirPrice"])  # AirPrice routes
+app.include_router(airprebook_router, prefix="/api/airprebook", tags=["AirPreBook"])  # AirPreBook routes
 
 # Health check endpoint
 @app.get("/", tags=["Health"])
@@ -91,6 +93,7 @@ async def shutdown_event():
     Actions to perform during the shutdown phase.
     """
     logger.info("Shutting down Travel Services API...")
+
 
 # from fastapi import FastAPI
 # from dotenv import load_dotenv
