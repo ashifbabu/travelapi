@@ -3,18 +3,21 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from app.flight_services.routes.combined import combined_search
 from app.flight_services.routes.rules import router as rules_router
-from app.flight_services.routes.airprice.airprice_routes import router as airprice_router  # AirPrice routes
-from app.flight_services.routes.airprebook.airprebook_routes import router as airprebook_router  # AirPreBook routes
+from app.flight_services.routes.airprice.airprice_routes import router as airprice_router
+from app.flight_services.routes.airprebook.airprebook_routes import router as airprebook_router
+from app.flight_services.routes.airbook.airbook_routes import router as airbook_router  # Added AirBook routes
+from app.flight_services.routes.airretrieve.airretrieve_routes import router as airretrieve_router
+
 import logging
 from starlette.middleware.cors import CORSMiddleware
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Travel Services API",
-    description="API for flight services, rules, air pricing, and prebooking",
-    version="1.0.0",
-    docs_url="/docs",  # Custom documentation URL
-    redoc_url="/redoc",  # Custom ReDoc URL
+    description="API for flight services, rules, air pricing, prebooking, and booking",
+    version="1.1.0",  # Updated version
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # Configure logging
@@ -37,9 +40,10 @@ app.add_middleware(
 # Register routes
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
 app.include_router(rules_router, prefix="/api/rules", tags=["Rules"])
-app.include_router(airprice_router, prefix="/api/airprice", tags=["AirPrice"])  # AirPrice routes
-app.include_router(airprebook_router, prefix="/api/airprebook", tags=["AirPreBook"])  # AirPreBook routes
-
+app.include_router(airprice_router, prefix="/api/airprice", tags=["AirPrice"])
+app.include_router(airprebook_router, prefix="/api/airprebook", tags=["AirPreBook"])
+app.include_router(airbook_router, prefix="/api/airbook", tags=["AirBook"])  # Added AirBook routes
+app.include_router(airretrieve_router, prefix="/api/airretrieve", tags=["AirRetrieve"])
 # Health check endpoint
 @app.get("/", tags=["Health"])
 async def health_check():
@@ -93,7 +97,6 @@ async def shutdown_event():
     Actions to perform during the shutdown phase.
     """
     logger.info("Shutting down Travel Services API...")
-
 
 # from fastapi import FastAPI
 # from dotenv import load_dotenv

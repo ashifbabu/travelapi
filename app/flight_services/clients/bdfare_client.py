@@ -29,6 +29,112 @@ print(f"BDFARE_API_KEY: {BDFARE_API_KEY}")
 
 
 
+
+logger = logging.getLogger("bdfare_client")
+
+async def fetch_bdfare_airretrieve(payload: dict) -> dict:
+    """
+    Fetch booking details from BDFare API.
+
+    Args:
+        payload (dict): Request payload with `orderReference`.
+
+    Returns:
+        dict: Response from the BDFare API.
+
+    Raises:
+        HTTPException: If an error occurs during the request.
+    """
+    url = f"{BDFARE_BASE_URL}/OrderRetrieve"
+    headers = {"X-API-KEY": BDFARE_API_KEY, "Content-Type": "application/json"}
+
+    logger.info(f"Sending AirRetrieve request to BDFare: {url}")
+    logger.debug(f"Payload: {payload}")
+
+    try:
+        # Make the POST request to BDFare API
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+
+        logger.info(f"BDFare AirRetrieve Response Status: {response.status_code}")
+        logger.debug(f"BDFare AirRetrieve Response Body: {response.text}")
+
+        # Raise for HTTP errors
+        response.raise_for_status()
+        return response.json()
+
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"BDFare API Error: {exc.response.text}")
+        raise HTTPException(
+            status_code=exc.response.status_code,
+            detail=f"BDFare API returned error: {exc.response.text}",
+        )
+    except Exception as e:
+        logger.exception("Unexpected error during BDFare AirRetrieve request.")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error fetching BDFare AirRetrieve: {str(e)}",
+        )
+async def fetch_bdfare_airbook(trace_id: str, offer_ids: List[str], request: dict) -> dict:
+    """
+    Fetch air booking from BDFare API.
+
+    Args:
+        trace_id (str): Unique trace ID for the booking.
+        offer_ids (List[str]): List of offer IDs related to the booking.
+        request (dict): The request payload with passenger and contact details.
+
+    Returns:
+        dict: The response from the BDFare API.
+
+    Raises:
+        HTTPException: If an error occurs during the request.
+    """
+    url = f"{BDFARE_BASE_URL}/OrderCreate"
+    headers = {"X-API-KEY": BDFARE_API_KEY, "Content-Type": "application/json"}
+
+    # Construct the payload
+    payload = {
+        "traceId": trace_id,
+        "offerId": offer_ids,
+        "request": request,
+    }
+
+    logger.info(f"Sending BDFare AirBook request to {url}")
+    logger.debug(f"Headers: {headers}")
+    logger.debug(f"Payload: {payload}")
+
+    try:
+        # Send the POST request to the BDFare API
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+
+        # Log the response status and body
+        logger.info(f"BDFare AirBook Response Status: {response.status_code}")
+        logger.debug(f"Response Headers: {response.headers}")
+        logger.debug(f"Response Body: {response.text}")
+
+        # Raise an exception if the response status is an HTTP error
+        response.raise_for_status()
+        return response.json()
+
+    except httpx.HTTPStatusError as exc:
+        # Handle HTTP errors and log detailed information
+        error_message = exc.response.text or "No error details provided"
+        logger.error(f"BDFare API Error: {error_message}")
+        raise HTTPException(
+            status_code=exc.response.status_code,
+            detail=f"BDFare API returned error: {error_message}"
+        )
+
+    except Exception as e:
+        # Handle unexpected exceptions
+        logger.exception("Unexpected error during BDFare AirBook request.")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error fetching BDFare AirBook: {str(e)}"
+        )
+
 async def fetch_bdfare_airprebook(trace_id: str, offer_ids: List[str], request: dict) -> dict:
     """
     Fetch air prebooking from BDFare API.

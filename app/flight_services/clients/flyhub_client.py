@@ -78,6 +78,132 @@ def get_flyhub_token() -> str:
             detail=f"An unexpected error occurred during FlyHub Authentication: {str(e)}",
         )
 #updated
+async def fetch_flyhub_airretrieve(payload: dict) -> dict:
+    """
+    Fetch air retrieve details from FlyHub API.
+
+    Args:
+        payload (dict): Request payload with `BookingID`.
+
+    Returns:
+        dict: The response from the FlyHub API.
+
+    Raises:
+        HTTPException: If the request fails or an error occurs.
+    """
+    try:
+        # Get a valid token (from cache or authenticate)
+        token = get_flyhub_token()
+        if not token:
+            raise HTTPException(
+                status_code=500,
+                detail="FlyHub authentication failed. Token is None."
+            )
+        
+        # Set up the API endpoint and headers
+        url = f"{FLYHUB_BASE_URL}/AirRetrieve"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        
+        # Log the request
+        logger.info(f"Sending AirRetrieve request to FlyHub. URL: {url}")
+        logger.info(f"Payload: {payload}")
+        
+        # Make the HTTP request
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
+        
+        # Raise for status if response indicates an error
+        response.raise_for_status()
+        
+        # Log the response
+        logger.info(f"FlyHub AirRetrieve response: {response.json()}")
+        return response.json()
+
+    except httpx.HTTPStatusError as http_err:
+        logger.error(f"FlyHub API returned an HTTP error: {http_err.response.text}")
+        raise HTTPException(
+            status_code=http_err.response.status_code,
+            detail=f"FlyHub API Error: {http_err.response.text}"
+        )
+
+    except Exception as e:
+        logger.exception(f"Unexpected error occurred while fetching FlyHub AirRetrieve: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred while fetching FlyHub AirRetrieve: {str(e)}"
+        )
+
+async def fetch_flyhub_airbook(search_id: str, result_id: str, passengers: list) -> dict:
+    """
+    Fetch air booking details from FlyHub API.
+
+    Args:
+        search_id (str): The FlyHub search ID.
+        result_id (str): The FlyHub result ID.
+        passengers (list): List of passenger details.
+
+    Returns:
+        dict: The response from the FlyHub API.
+
+    Raises:
+        HTTPException: If the request fails or an error occurs.
+    """
+    try:
+        # Get a valid token (from cache or authenticate)
+        token = get_flyhub_token()
+        if not token:
+            raise HTTPException(
+                status_code=500,
+                detail="FlyHub authentication failed. Token is None."
+            )
+        
+        # Set up the API endpoint and headers
+        url = f"{FLYHUB_BASE_URL}/AirBook"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        
+        # Create the payload
+        payload = {
+            "SearchID": search_id,
+            "ResultID": result_id,
+            "Passengers": passengers
+        }
+        
+        # Log the request
+        logger.info(f"Sending AirBook request to FlyHub. URL: {url}")
+        logger.info(f"Payload: {payload}")
+        
+        # Make the HTTP request
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
+        
+        # Raise for status if response indicates an error
+        response.raise_for_status()
+        
+        # Log the response
+        logger.info(f"FlyHub AirBook response: {response.json()}")
+        return response.json()
+
+    except httpx.HTTPStatusError as http_err:
+        logger.error(f"FlyHub API returned an HTTP error: {http_err.response.text}")
+        raise HTTPException(
+            status_code=http_err.response.status_code,
+            detail=f"FlyHub API Error: {http_err.response.text}"
+        )
+
+    except Exception as e:
+        logger.exception(f"Unexpected error occurred while fetching FlyHub AirBook: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred while fetching FlyHub AirBook: {str(e)}"
+        )
+    
+    
 async def fetch_flyhub_airprebook(search_id: str, result_id: str, passengers: list) -> dict:
     """
     Fetch air prebooking details from FlyHub API.
