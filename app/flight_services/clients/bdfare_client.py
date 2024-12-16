@@ -32,6 +32,45 @@ print(f"BDFARE_API_KEY: {BDFARE_API_KEY}")
 
 logger = logging.getLogger("bdfare_client")
 
+async def fetch_bdfare_ticket_cancel(payload: dict) -> dict:
+    url = f"{BDFARE_BASE_URL}/OrderCancel"
+    headers = {"X-API-KEY": BDFARE_API_KEY, "Content-Type": "application/json"}
+
+    logger.info(f"Sending Ticket Cancel request to BDFare: {url}")
+    logger.debug(f"Payload: {payload}")
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+        logger.info(f"BDFare Ticket Cancel Response Status: {response.status_code}")
+        logger.debug(f"BDFare Ticket Cancel Response Body: {response.text}")
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.exception("Error during BDFare Ticket Cancel.")
+        raise HTTPException(status_code=500, detail=f"Error in BDFare Ticket Cancel: {str(e)}")
+
+async def fetch_bdfare_ticket_issue(payload: dict) -> dict:
+    """
+    Fetch ticket issue details from BDFare API.
+    """
+    url = f"{BDFARE_BASE_URL}/OrderChange"
+    headers = {"X-API-KEY": BDFARE_API_KEY, "Content-Type": "application/json"}
+
+    logger.info(f"Sending Ticket Issue request to BDFare: {url}")
+    logger.debug(f"Payload: {payload}")
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+        logger.info(f"BDFare Ticket Issue Response Status: {response.status_code}")
+        logger.debug(f"BDFare Ticket Issue Response Body: {response.text}")
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.exception("Error during BDFare Ticket Issue.")
+        raise HTTPException(status_code=500, detail=f"Error in BDFare Ticket Issue: {str(e)}")
+
 async def fetch_bdfare_airretrieve(payload: dict) -> dict:
     """
     Fetch booking details from BDFare API.

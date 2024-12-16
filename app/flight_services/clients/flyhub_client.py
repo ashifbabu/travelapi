@@ -78,6 +78,45 @@ def get_flyhub_token() -> str:
             detail=f"An unexpected error occurred during FlyHub Authentication: {str(e)}",
         )
 #updated
+async def fetch_flyhub_ticket_cancel(payload: dict) -> dict:
+    url = f"{FLYHUB_BASE_URL}/AirCancel"
+    headers = {"Authorization": f"Bearer {get_flyhub_token()}", "Content-Type": "application/json"}
+
+    logger.info(f"Sending Ticket Cancel request to FlyHub: {url}")
+    logger.debug(f"Payload: {payload}")
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+        logger.info(f"FlyHub Ticket Cancel Response Status: {response.status_code}")
+        logger.debug(f"FlyHub Ticket Cancel Response Body: {response.text}")
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.exception("Error during FlyHub Ticket Cancel.")
+        raise HTTPException(status_code=500, detail=f"Error in FlyHub Ticket Cancel: {str(e)}")
+
+async def fetch_flyhub_ticket_issue(payload: dict) -> dict:
+    """
+    Fetch ticket issue details from FlyHub API.
+    """
+    url = f"{FLYHUB_BASE_URL}/AirTicketing"
+    headers = {"Authorization": f"Bearer {get_flyhub_token()}", "Content-Type": "application/json"}
+
+    logger.info(f"Sending Ticket Issue request to FlyHub: {url}")
+    logger.debug(f"Payload: {payload}")
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+        logger.info(f"FlyHub Ticket Issue Response Status: {response.status_code}")
+        logger.debug(f"FlyHub Ticket Issue Response Body: {response.text}")
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.exception("Error during FlyHub Ticket Issue.")
+        raise HTTPException(status_code=500, detail=f"Error in FlyHub Ticket Issue: {str(e)}")
+
 async def fetch_flyhub_airretrieve(payload: dict) -> dict:
     """
     Fetch air retrieve details from FlyHub API.
