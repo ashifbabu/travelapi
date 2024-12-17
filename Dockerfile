@@ -8,8 +8,8 @@ WORKDIR /usr/src/app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy FastAPI app
-COPY ./main.py ./main.py
+# Copy the entire project (including the app/ folder)
+COPY . .
 
 # Expose the port
 EXPOSE 8000
