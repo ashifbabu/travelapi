@@ -7,6 +7,5 @@ services:
     ports:
       - "8000:8000"
     restart: always
-    environment:
-      - ENVIRONMENT=production
-      - LOG_LEVEL=info
+    env_file:
+      - .env # Load environment variables
