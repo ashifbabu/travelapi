@@ -1,12 +1,10 @@
-
-#app\flight_services\services\combined_service.py
 from app.flight_services.clients.bdfare_client import fetch_bdfare_flights
 from app.flight_services.clients.flyhub_client import fetch_flyhub_flights
 from app.flight_services.adapters.flyhub_adapter import convert_bdfare_to_flyhub
+from app.flight_services.adapters.combined_search import format_flight_data_with_ids
 from fastapi import HTTPException
 import asyncio
 import logging
-import os
 
 logger = logging.getLogger("combined_service")
 
@@ -18,7 +16,7 @@ async def combined_search(payload):
         payload (dict): Unified payload for flight search.
 
     Returns:
-        dict: Raw flight results from BDFare, FlyHub, or both.
+        dict: Formatted flight results from BDFare, FlyHub, or both.
     """
     try:
         # Extract and log the request payload
@@ -45,13 +43,12 @@ async def combined_search(payload):
         }
         logger.info(f"Enriched request data for processing: {enriched_request_data}")
 
-        results = {}
+        raw_results = {}
 
         if source == "bdfare":
             # Fetch raw results from BDFare
             logger.info("Fetching results from BDFare...")
-            bdfare_response = await fetch_bdfare_flights(enriched_request_data)
-            results["bdfare"] = bdfare_response
+            raw_results["bdfare"] = await fetch_bdfare_flights(enriched_request_data)
 
         elif source == "flyhub":
             # Transform payload for FlyHub
@@ -61,8 +58,7 @@ async def combined_search(payload):
 
             # Fetch raw results from FlyHub
             logger.info("Fetching results from FlyHub...")
-            flyhub_response = await fetch_flyhub_flights(flyhub_payload)
-            results["flyhub"] = flyhub_response
+            raw_results["flyhub"] = await fetch_flyhub_flights(flyhub_payload)
 
         elif source == "all":
             # Transform payload for FlyHub
@@ -77,14 +73,19 @@ async def combined_search(payload):
 
             bdfare_response, flyhub_response = await asyncio.gather(bdfare_task, flyhub_task)
 
-            results["bdfare"] = bdfare_response
-            results["flyhub"] = flyhub_response
+            raw_results["bdfare"] = bdfare_response
+            raw_results["flyhub"] = flyhub_response
 
         else:
             raise ValueError(f"Invalid source specified: {source}")
 
-        logger.info(f"Search results successfully retrieved for source: {source}")
-        return results
+        logger.info(f"Raw results retrieved for source: {source}")
+
+        # Format the raw results using the adapter
+        formatted_results = format_flight_data_with_ids(raw_results)
+
+        logger.info("Formatted flight search results successfully.")
+        return formatted_results
 
     except KeyError as e:
         logger.error(f"Missing key in payload: {e}")
