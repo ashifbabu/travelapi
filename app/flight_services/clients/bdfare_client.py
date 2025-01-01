@@ -252,6 +252,12 @@ async def fetch_bdfare_airprice(trace_id: str, offer_ids: list) -> dict:
 async def fetch_bdfare_flights(payload: dict) -> dict:
     """
     Fetch flights from BDFare API with a fallback to curl.
+
+    Args:
+        payload (dict): The transformed payload for the BDFare API.
+
+    Returns:
+        dict: The response from the BDFare API.
     """
     transformed_payload = convert_to_bdfare_request(payload)  # Transform payload
     url = f"{BDFARE_BASE_URL}/AirShopping"
@@ -266,21 +272,30 @@ async def fetch_bdfare_flights(payload: dict) -> dict:
             response = await client.post(url, json=transformed_payload, headers=headers)
 
         if response.status_code == 200:
+            logger.info(f"BDFare API Response: {response.json()}")
             return response.json()
         else:
+            logger.error(f"BDFare API returned an error: {response.text}")
             raise HTTPException(
                 status_code=response.status_code,
                 detail=f"BDFare API Error: {response.text}",
             )
     except Exception as httpx_exception:
         # Log the error and fall back to curl
-        print(f"HTTPX request failed: {httpx_exception}. Falling back to curl...")
+        logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to curl...")
         return fallback_to_curl(url, transformed_payload)
 
 
 def fallback_to_curl(url: str, payload: dict) -> dict:
     """
     Fallback to curl if httpx fails.
+
+    Args:
+        url (str): The API endpoint URL.
+        payload (dict): The payload to be sent in the request.
+
+    Returns:
+        dict: The response from the BDFare API.
     """
     try:
         payload_json = json.dumps(payload)
@@ -296,6 +311,7 @@ def fallback_to_curl(url: str, payload: dict) -> dict:
         result = subprocess.run(curl_command, capture_output=True, text=True)
 
         if result.returncode != 0:
+            logger.error(f"Curl command failed with error: {result.stderr}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Curl command failed: {result.stderr}"
@@ -304,18 +320,20 @@ def fallback_to_curl(url: str, payload: dict) -> dict:
         # Parse the curl response
         try:
             response_data = json.loads(result.stdout)
+            logger.info(f"BDFare Curl Response: {response_data}")
             return response_data
         except json.JSONDecodeError:
+            logger.error(f"Failed to decode JSON response from curl: {result.stdout}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to decode JSON response from curl: {result.stdout}",
             )
     except Exception as e:
+        logger.exception(f"An unexpected error occurred during the curl fallback: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"An unexpected error occurred during the curl fallback: {str(e)}"
         )
-
 
 # import requests
 # import os

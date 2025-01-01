@@ -96,19 +96,20 @@
 def format_flight_data_with_ids(data):
     flights = []
 
-    # Process bdfare
+       # Process bdfare
     if "bdfare" in data and data["bdfare"].get("response"):
         trace_id = data["bdfare"]["response"].get("traceId", "N/A")
         offers_group = data["bdfare"]["response"].get("offersGroup", [])
+        special_offers_group = data["bdfare"]["response"].get("specialReturnOffersGroup", {})
 
-        if offers_group:  # Ensure offersGroup is not None
-            for offer_group in offers_group:
-                offer = offer_group.get("offer", {})
+        def process_offer_group(offer_group, source_label):
+            for offer_group_item in offer_group.get("ob", []) + offer_group.get("ib", []):
+                offer = offer_group_item.get("offer", {})
                 fare_details = offer.get("fareDetailList", [])
                 pax_segments = offer.get("paxSegmentList", [])
                 baggage_list = offer.get("baggageAllowanceList", [])
 
-                # Process segments for multicity, oneway, or return flights
+                # Process segments
                 segments = []
                 for segment_item in pax_segments:
                     pax_segment = segment_item.get("paxSegment", {})
@@ -156,7 +157,7 @@ def format_flight_data_with_ids(data):
                     })
 
                 flights.append({
-                    "Source": "bdfare",
+                    "Source": source_label,
                     "TraceId": trace_id,
                     "OfferId": offer.get("offerId", "Unknown"),
                     "Segments": segments,
@@ -166,6 +167,12 @@ def format_flight_data_with_ids(data):
                     "FareType": offer.get("fareType", "Unknown"),
                     "SeatsRemaining": int(offer.get("seatsRemaining", 0))
                 })
+
+        if offers_group:  # Ensure offersGroup is not None
+            process_offer_group({"ob": offers_group}, "bdfare")
+
+        if special_offers_group:  # Process special offers group under the same source label "bdfare"
+            process_offer_group(special_offers_group, "bdfare")
 
     # Process flyhub
     if "flyhub" in data and data["flyhub"].get("Results"):
