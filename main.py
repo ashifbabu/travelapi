@@ -2,11 +2,11 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 import pandas as pd
-
+import json
 import logging
 from fastapi import Query
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional
 from starlette.middleware.cors import CORSMiddleware
 from app.flight_services.routes.combined import combined_search
@@ -44,18 +44,21 @@ app.add_middleware(
 # Define the Pydantic model
 class Airport(BaseModel):
     city: Optional[str]
-    country: Optional[str]  # This correctly should contain the country name
-    airportName: Optional[str]  # This correctly should contain the airport name
-    code: Optional[str] = Field(None, alias="iata_code")
+    country: Optional[str]  # Should contain the actual country
+    airportName: Optional[str]  # Should contain the name of the airport
+    code: Optional[str] = None  # Handle IATA code being optional
+
+    @validator('code', pre=True, always=True)
+    def set_code_to_empty_string_if_none(cls, v):
+        return v or "N/A"  # Replace null IATA codes with "N/A"
 
     class Config:
-        allow_population_by_field_name = True
         schema_extra = {
             "example": {
-                "city": "Dhaka",
-                "country": "Bangladesh",
-                "airportName": "Hazrat Shahjalal International Airport",
-                "code": "DAC"
+                "city": "Dubai",
+                "country": "United Arab Emirates",
+                "airportName": "Dubai International Airport",
+                "code": "DXB"  # Example, adjust according to actual data
             }
         }
 
@@ -66,14 +69,21 @@ airports_df = None
 @app.on_event("startup")
 async def load_airport_data():
     global airports_df
-    airports_df = pd.read_csv('app/flight_services/data/airports.csv', usecols=["IATA", "Country", "Airport name", "City"])
-    airports_df.columns = ['iata_code', 'country', 'airport_name', 'city']  # Ensure columns are correctly named to match the model fields
-    airports_df = airports_df.dropna()  # Drop rows where any column is missing
+    with open('app/flight_services/data/airports.json', 'r', encoding='utf-8') as file:
+        data = json.load(file)
+    airports_df = pd.json_normalize(data)  # Convert JSON to DataFrame
+    airports_df.rename(columns={
+        'IATA': 'iata_code', 
+        'Country': 'country', 
+        'Airport name': 'airport_name', 
+        'City': 'city'
+    }, inplace=True)
+    airports_df.dropna(subset=['iata_code'], inplace=True)  # Ensure no null IATA codes
     logger.info("Airport data loaded successfully.")
-    logger.debug(f"Sample data: {airports_df.head().to_dict(orient='records')}")
+
 
 # Endpoint to get airport data
-@app.get("/api/airports/", response_model=List[Airport], tags=["Airport Search"])
+@app.get("/api/airports/", response_model=List[Airport])
 async def search_airports(query: Optional[str] = Query(None, description="Search by airport code or name")):
     if not query:
         return []
@@ -83,11 +93,10 @@ async def search_airports(query: Optional[str] = Query(None, description="Search
         (airports_df['airport_name'].str.lower().str.contains(query)) |
         (airports_df['city'].str.lower().str.contains(query))
     ]
-    logger.info(f"Query results: {results.head().to_dict(orient='records')}")
     return [Airport(
         city=row['city'],
-        country=row['airport_name'],  # Corrected: This should be the name of the airport
-        airportName=row['country'],  # Corrected: This should be the country name
+        country=row['country'],
+        airportName=row['airport_name'],
         code=row['iata_code']
     ) for index, row in results.iterrows()]
 
