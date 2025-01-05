@@ -92,7 +92,7 @@
 
 #     return {"Flights": flights}
 
-
+from app.flight_services.services.ailineLogoService import get_airline_by_id
 def format_flight_data_with_ids(data):
     flights = []
 
@@ -113,6 +113,10 @@ def format_flight_data_with_ids(data):
                 segments = []
                 for segment_item in pax_segments:
                     pax_segment = segment_item.get("paxSegment", {})
+                    airline_code = pax_segment.get('marketingCarrierInfo', {}).get('carrierDesigCode', 'Unknown')
+                    airline_data = get_airline_by_id(airline_code)  # Use the function to get airline data
+                    airline_logo = airline_data['logo'] if airline_data else 'Logo not available'
+                   
                     segments.append({
                         "From": {
                             "Code": pax_segment.get("departure", {}).get("iatA_LocationCode", ""),
@@ -124,8 +128,11 @@ def format_flight_data_with_ids(data):
                             "Name": pax_segment.get("arrival", {}).get("terminalName", ""),
                             "ArrivalTime": pax_segment.get("arrival", {}).get("aircraftScheduledDateTime", "")
                         },
-                        "Airline": f"{pax_segment.get('marketingCarrierInfo', {}).get('carrierName', 'Unknown')} ({pax_segment.get('marketingCarrierInfo', {}).get('carrierDesigCode', 'Unknown')})",
-                        "FlightNumber": pax_segment.get("flightNumber", "Unknown"),
+ "Airline": {
+            "Name": pax_segment.get('marketingCarrierInfo', {}).get('carrierName', 'Unknown'),
+             "Code": airline_code,
+                            "Logo": airline_logo 
+        },                        "FlightNumber": pax_segment.get("flightNumber", "Unknown"),
                         "CabinClass": pax_segment.get("cabinType", "Unknown"),
                         "Duration": f"{pax_segment.get('duration', 0)} minutes"
                     })
@@ -203,8 +210,11 @@ def format_flight_data_with_ids(data):
                                 "Name": seg.get("Destination", {}).get("Airport", {}).get("AirportName", "Unknown"),
                                 "ArrivalTime": seg.get("Destination", {}).get("ArrTime", "Unknown")
                             },
-                            "Airline": f"{seg.get('Airline', {}).get('AirlineName', 'Unknown')} ({seg.get('Airline', {}).get('AirlineCode', 'Unknown')})",
-                            "FlightNumber": seg.get("Airline", {}).get("FlightNumber", "Unknown"),
+"Airline": {
+                    "Name": seg.get('Airline', {}).get('AirlineName', 'Unknown'),
+                    "Code": seg.get('Airline', {}).get('AirlineCode', 'Unknown'),
+                     "Logo": get_airline_by_id(seg.get('Airline', {}).get('AirlineCode', 'Unknown'))['logo']
+                },                            "FlightNumber": seg.get("Airline", {}).get("FlightNumber", "Unknown"),
                             "CabinClass": seg.get("Airline", {}).get("CabinClass", "Unknown"),
                             "Duration": f"{seg.get('JourneyDuration', 0)} minutes",
                             "Baggage": seg.get("baggageDetails", [{}])[0].get("Checkin", "Not Available") if seg.get("baggageDetails") else "Not Available"

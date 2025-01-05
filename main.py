@@ -1,21 +1,26 @@
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+import pandas as pd
+
+import logging
+from fastapi import Query
+from typing import List
+from pydantic import BaseModel, Field
+from typing import Optional
+from starlette.middleware.cors import CORSMiddleware
 from app.flight_services.routes.combined import combined_search
 from app.flight_services.routes.rules import router as rules_router
 from app.flight_services.routes.airprice.airprice_routes import router as airprice_router
 from app.flight_services.routes.airprebook.airprebook_routes import router as airprebook_router
-from app.flight_services.routes.airbook.airbook_routes import router as airbook_router  # Added AirBook routes
+from app.flight_services.routes.airbook.airbook_routes import router as airbook_router
 from app.flight_services.routes.airretrieve.airretrieve_routes import router as airretrieve_router
-
-import logging
-from starlette.middleware.cors import CORSMiddleware
-
+from app.flight_services.services.ailineLogoService import get_airline_by_id
 # Initialize FastAPI app
 app = FastAPI(
     title="Travel Services API",
     description="API for flight services, rules, air pricing, prebooking, and booking",
-    version="1.1.0",  # Updated version
+    version="1.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -31,72 +36,106 @@ logger.addHandler(handler)
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace '*' with specific domains in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Define the Pydantic model
+class Airport(BaseModel):
+    city: Optional[str]
+    country: Optional[str]  # This correctly should contain the country name
+    airportName: Optional[str]  # This correctly should contain the airport name
+    code: Optional[str] = Field(None, alias="iata_code")
 
-# Register routes
+    class Config:
+        allow_population_by_field_name = True
+        schema_extra = {
+            "example": {
+                "city": "Dhaka",
+                "country": "Bangladesh",
+                "airportName": "Hazrat Shahjalal International Airport",
+                "code": "DAC"
+            }
+        }
+
+# Global variable to hold the data
+airports_df = None
+
+# Load the CSV file into a DataFrame
+@app.on_event("startup")
+async def load_airport_data():
+    global airports_df
+    airports_df = pd.read_csv('app/flight_services/data/airports.csv', usecols=["IATA", "Country", "Airport name", "City"])
+    airports_df.columns = ['iata_code', 'country', 'airport_name', 'city']  # Ensure columns are correctly named to match the model fields
+    airports_df = airports_df.dropna()  # Drop rows where any column is missing
+    logger.info("Airport data loaded successfully.")
+    logger.debug(f"Sample data: {airports_df.head().to_dict(orient='records')}")
+
+# Endpoint to get airport data
+@app.get("/api/airports/", response_model=List[Airport], tags=["Airport Search"])
+async def search_airports(query: Optional[str] = Query(None, description="Search by airport code or name")):
+    if not query:
+        return []
+    query = query.lower().strip()
+    results = airports_df[
+        (airports_df['iata_code'].str.lower() == query) |
+        (airports_df['airport_name'].str.lower().str.contains(query)) |
+        (airports_df['city'].str.lower().str.contains(query))
+    ]
+    logger.info(f"Query results: {results.head().to_dict(orient='records')}")
+    return [Airport(
+        city=row['city'],
+        country=row['airport_name'],  # Corrected: This should be the name of the airport
+        airportName=row['country'],  # Corrected: This should be the country name
+        code=row['iata_code']
+    ) for index, row in results.iterrows()]
+
+
+@app.get("/airline/{airline_id}/logo", response_model=str, status_code=200)
+def read_airline_logo(airline_id: str):
+    airline = get_airline_by_id(airline_id)
+    if airline is None:
+        raise HTTPException(status_code=404, detail="Airline not found")
+    return airline.get('logo', 'Logo not available')
+
+
+# Register other routes
 app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
 app.include_router(rules_router, prefix="/api/rules", tags=["Rules"])
 app.include_router(airprice_router, prefix="/api/airprice", tags=["AirPrice"])
 app.include_router(airprebook_router, prefix="/api/airprebook", tags=["AirPreBook"])
-app.include_router(airbook_router, prefix="/api/airbook", tags=["AirBook"])  # Added AirBook routes
+app.include_router(airbook_router, prefix="/api/airbook", tags=["AirBook"])
 app.include_router(airretrieve_router, prefix="/api/airretrieve", tags=["AirRetrieve"])
-# Health check endpoint
+
 @app.get("/", tags=["Health"])
 async def health_check():
-    """
-    Health check endpoint to verify the service is running.
-    """
     logger.info("Health check endpoint accessed.")
     return {"status": "ok", "message": "Service is running"}
 
-# Global exception handler for request validation errors
+# Exception handlers
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """
-    Custom handler for request validation errors.
-    """
     logger.error("Validation error occurred: %s", exc.errors())
     return JSONResponse(
         status_code=422,
         content={
             "detail": exc.errors(),
-            "message": "Request validation failed. Check your input format.",
+            "message": "Request validation failed. Check your input format."
         },
     )
 
-# Global exception handler for unexpected errors
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """
-    Custom handler for all uncaught exceptions.
-    """
     logger.error("Unexpected error occurred: %s", exc)
     return JSONResponse(
         status_code=500,
         content={
             "detail": "Internal server error",
-            "message": "An unexpected error occurred. Please try again later.",
+            "message": "An unexpected error occurred. Please try again later."
         },
     )
 
-# Event handlers for startup and shutdown
-@app.on_event("startup")
-async def startup_event():
-    """
-    Actions to perform during the startup phase.
-    """
-    logger.info("Starting Travel Services API...")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """
-    Actions to perform during the shutdown phase.
-    """
-    logger.info("Shutting down Travel Services API...")
 
 # from fastapi import FastAPI
 # from dotenv import load_dotenv
