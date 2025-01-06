@@ -83,22 +83,35 @@ async def load_airport_data():
 
 
 # Endpoint to get airport data
+# Endpoint to get exactly 8 airport data
 @app.get("/api/airports/", response_model=List[Airport])
-async def search_airports(query: Optional[str] = Query(None, description="Search by airport code or name")):
+async def search_airports(query: Optional[str] = Query(None, description="Search by airport code, name, or city")):
     if not query:
         return []
+
     query = query.lower().strip()
+
+    # Perform a case-insensitive search
     results = airports_df[
-        (airports_df['iata_code'].str.lower() == query) |
-        (airports_df['airport_name'].str.lower().str.contains(query)) |
-        (airports_df['city'].str.lower().str.contains(query))
+        airports_df['city'].str.lower().str.contains(query) |
+        airports_df['country'].str.lower().str.contains(query) |
+        airports_df['airport_name'].str.lower().str.contains(query) |
+        airports_df['iata_code'].str.lower().str.contains(query)
     ]
-    return [Airport(
-        city=row['city'],
-        country=row['country'],
-        airportName=row['airport_name'],
-        code=row['iata_code']
-    ) for index, row in results.iterrows()]
+
+    # Limit the results to 8
+    limited_results = results.head(8)
+
+    # Convert the DataFrame rows to a list of Airport models
+    return [
+        Airport(
+            city=row['city'],
+            country=row['country'],
+            airportName=row['airport_name'],
+            code=row['iata_code']
+        )
+        for index, row in limited_results.iterrows()
+    ]
 
 
 @app.get("/airline/{airline_id}/logo", response_model=str, status_code=200)

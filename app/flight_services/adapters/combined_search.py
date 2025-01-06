@@ -1,6 +1,39 @@
-
-
+import pandas as pd
+import json
+import logging
 from app.flight_services.services.ailineLogoService import get_airline_by_id
+
+# ✅ Configure logging
+logger = logging.getLogger("format_flight_data")
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+# ✅ Load airport data from a JSON file into a DataFrame
+with open('app/flight_services/data/airports.json', 'r', encoding='utf-8') as file:
+    data = json.load(file)
+airports_df = pd.json_normalize(data)
+airports_df.rename(columns={
+    'IATA': 'iata_code',
+    'Airport name': 'airport_name',
+    'City': 'city',
+    'Country': 'country'
+}, inplace=True)
+airports_df.dropna(subset=['iata_code'], inplace=True)
+
+# ✅ Function to get airport name by IATA code
+def get_airport_name_by_code(iata_code):
+    logger.info(f"Fetching airport name for IATA code: {iata_code}")
+    if airports_df is not None:
+        result = airports_df.loc[airports_df['iata_code'].str.upper() == iata_code.upper(), 'airport_name']
+        if not result.empty:
+            airport_name = result.values[0]
+            logger.info(f"Found airport name: {airport_name} for IATA code: {iata_code}")
+            return airport_name
+    logger.warning(f"Airport name not found for IATA code: {iata_code}")
+    return "Unknown Airport"
 def format_flight_data_with_ids(data):
     flights = []
 
@@ -21,19 +54,29 @@ def format_flight_data_with_ids(data):
                 segments = []
                 for segment_item in pax_segments:
                     pax_segment = segment_item.get("paxSegment", {})
+
+                    # Get airport codes
+                    departure_code = pax_segment.get("departure", {}).get("iatA_LocationCode", "")
+                    arrival_code = pax_segment.get("arrival", {}).get("iatA_LocationCode", "")
+
+                    # ✅ Get airport names
+                    departure_name = get_airport_name_by_code(departure_code)
+                    arrival_name = get_airport_name_by_code(arrival_code)
+
+                    # Get airline details
                     airline_code = pax_segment.get('marketingCarrierInfo', {}).get('carrierDesigCode', 'Unknown')
-                    airline_data = get_airline_by_id(airline_code)  # Use the function to get airline data
+                    airline_data = get_airline_by_id(airline_code)
                     airline_logo = airline_data['logo'] if airline_data else 'Logo not available'
-                   
+
                     segments.append({
                         "From": {
-                            "Code": pax_segment.get("departure", {}).get("iatA_LocationCode", ""),
-                            "Name": pax_segment.get("departure", {}).get("terminalName", ""),
+                            "Code": departure_code,
+                            "Name": departure_name,
                             "DepartureTime": pax_segment.get("departure", {}).get("aircraftScheduledDateTime", "")
                         },
                         "To": {
-                            "Code": pax_segment.get("arrival", {}).get("iatA_LocationCode", ""),
-                            "Name": pax_segment.get("arrival", {}).get("terminalName", ""),
+                            "Code": arrival_code,
+                            "Name": arrival_name,
                             "ArrivalTime": pax_segment.get("arrival", {}).get("aircraftScheduledDateTime", "")
                         },
  "Airline": {
