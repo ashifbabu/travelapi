@@ -249,9 +249,9 @@ async def fetch_bdfare_airprice(trace_id: str, offer_ids: list) -> dict:
             detail=f"BDFare API Error: {exc.response.text}"
         )
     
-def fetch_bdfare_flights(payload: dict) -> dict:
+async def fetch_bdfare_flights(payload: dict) -> dict:
     """
-    Fetch flights from BDFare API using requests.
+    Fetch flights from BDFare API using httpx, asynchronously.
 
     Args:
         payload (dict): The transformed payload for the BDFare API.
@@ -259,21 +259,20 @@ def fetch_bdfare_flights(payload: dict) -> dict:
     Returns:
         dict: The response from the BDFare API.
     """
-    transformed_payload = convert_to_bdfare_request(payload)  # Transform payload
+    transformed_payload = convert_to_bdfare_request(payload)  # Assuming this is a synchronous function
     url = f"{BDFARE_BASE_URL}/AirShopping"
     headers = {
         "X-API-KEY": BDFARE_API_KEY,
         "Content-Type": "application/json",
     }
 
-    try:
-        response = requests.post(url, json=transformed_payload, headers=headers)
-        response.raise_for_status()  # This will raise an exception for HTTP error codes
-        logger.info(f"BDFare API Response: {response.json()}")
-        return response.json()
-    except RequestException as req_err:
-        logger.error(f"Request failed: {req_err}. Response: {getattr(req_err.response, 'text', 'No response text available')}")
-        raise HTTPException(
-            status_code=req_err.response.status_code if req_err.response else 500,
-            detail=f"BDFare API Error: {getattr(req_err.response, 'text', 'No detailed error available')}"
-        )
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=transformed_payload, headers=headers)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"BDFare API Error: {response.text}",
+            )
