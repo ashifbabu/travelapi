@@ -420,7 +420,7 @@ async def fetch_flyhub_flights(payload: dict) -> dict:
     except Exception as httpx_exception:
         # Log the error and fall back to curl
         logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to curl...")
-        return fallback_to_curl(payload)
+        return fallback_to_requests(payload)
 
 
 def fallback_to_requests(payload: dict) -> dict:
