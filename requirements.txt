@@ -6,3 +6,4 @@ python-dotenv
 gunicorn
 pydantic[email]
 pandas
+requests
