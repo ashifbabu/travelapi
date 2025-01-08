@@ -7,6 +7,7 @@ from fastapi import HTTPException
 import os
 import logging
 import time
+import requests
 from dotenv import load_dotenv  # Import dotenv
 
 # Load environment variables from .env file
@@ -422,21 +423,18 @@ async def fetch_flyhub_flights(payload: dict) -> dict:
         return fallback_to_curl(payload)
 
 
-def fallback_to_curl(payload: dict) -> dict:
+def fallback_to_requests(payload: dict) -> dict:
     """
-    Fallback to curl if httpx fails.
+    Fallback to requests if httpx fails.
     """
-    # Validate FlyHub Base URL
     validate_url(FLYHUB_BASE_URL)
-
-    # FlyHub API endpoint
     url = f"{FLYHUB_BASE_URL}/AirSearch"
     token = cached_token.get("token", None)
 
     if not token:
         raise HTTPException(
             status_code=500,
-            detail="Cannot perform curl fallback: Missing authentication token.",
+            detail="Cannot perform requests fallback: Missing authentication token.",
         )
 
     headers = {
@@ -445,38 +443,18 @@ def fallback_to_curl(payload: dict) -> dict:
     }
 
     try:
-        payload_json = json.dumps(payload)
-        curl_command = [
-            "curl",
-            "-X", "POST",
-            url,
-            "-H", f"Authorization: {headers['Authorization']}",
-            "-H", "Content-Type: application/json",
-            "-d", payload_json,
-        ]
-
-        result = subprocess.run(curl_command, capture_output=True, text=True)
-
-        if result.returncode != 0:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+        else:
             raise HTTPException(
-                status_code=500,
-                detail=f"Curl command failed: {result.stderr}",
+                status_code=response.status_code,
+                detail=f"Requests API Error: {response.text}",
             )
-
-        # Parse the curl response
-        try:
-            response_data = json.loads(result.stdout)
-            logger.info("FlyHub response retrieved via curl fallback.")
-            return response_data
-        except json.JSONDecodeError:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to decode JSON response from curl: {result.stdout}",
-            )
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         raise HTTPException(
             status_code=500,
-            detail=f"An unexpected error occurred during the curl fallback: {str(e)}",
+            detail=f"Requests fallback error: {str(e)}",
         )
 
 
