@@ -1,24 +1,15 @@
-from app.flight_services.clients.bdfare_client import fetch_bdfare_flights
-from app.flight_services.clients.flyhub_client import fetch_flyhub_flights
-from app.flight_services.adapters.flyhub_adapter import convert_bdfare_to_flyhub
-from app.flight_services.adapters.combined_search import format_flight_data_with_ids
-from fastapi import HTTPException
-import asyncio
 import logging
-
-logger = logging.getLogger("combined_service")
-
 import asyncio
-import logging
 from fastapi import HTTPException
 from app.flight_services.clients.bdfare_client import fetch_bdfare_flights
 from app.flight_services.clients.flyhub_client import fetch_flyhub_flights
 from app.flight_services.adapters.flyhub_adapter import convert_bdfare_to_flyhub
 from app.flight_services.adapters.combined_search import format_flight_data_with_ids
 
+# Initialize logger
 logger = logging.getLogger("combined_service")
 
-async def combined_search(payload):
+async def combined_search(payload: dict) -> dict:
     """
     Perform a combined flight search using BDFare and FlyHub APIs based on the source.
 
@@ -81,10 +72,23 @@ async def combined_search(payload):
             bdfare_task = fetch_bdfare_flights(enriched_request_data)
             flyhub_task = fetch_flyhub_flights(flyhub_payload)
 
-            bdfare_response, flyhub_response = await asyncio.gather(bdfare_task, flyhub_task)
+            # Await both tasks and handle errors individually
+            bdfare_response, flyhub_response = await asyncio.gather(
+                bdfare_task, flyhub_task, return_exceptions=True
+            )
 
-            logger.info(f"BDFare response: {bdfare_response}")
-            logger.info(f"FlyHub response: {flyhub_response}")
+            # Log and handle errors from both tasks
+            if isinstance(bdfare_response, Exception):
+                logger.error(f"BDFare fetch error: {bdfare_response}")
+                bdfare_response = None
+            else:
+                logger.info(f"BDFare response: {bdfare_response}")
+
+            if isinstance(flyhub_response, Exception):
+                logger.error(f"FlyHub fetch error: {flyhub_response}")
+                flyhub_response = None
+            else:
+                logger.info(f"FlyHub response: {flyhub_response}")
 
             raw_results["bdfare"] = bdfare_response
             raw_results["flyhub"] = flyhub_response

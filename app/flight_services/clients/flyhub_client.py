@@ -376,9 +376,10 @@ async def fetch_flyhub_airprice(search_id: str, result_id: str):
             detail=f"An unexpected error occurred while fetching FlyHub AirPrice: {str(e)}"
         )
 
+
 async def fetch_flyhub_flights(payload: dict) -> dict:
     """
-    Fetch flights from FlyHub API with a fallback to curl.
+    Fetch flights from FlyHub API with a fallback to requests.
     """
     try:
         # Authenticate and get the token
@@ -413,18 +414,19 @@ async def fetch_flyhub_flights(payload: dict) -> dict:
             logger.info("FlyHub response received successfully.")
             return response.json()
         else:
+            logger.error(f"FlyHub API Error: {response.status_code}, {response.text}")
             raise HTTPException(
                 status_code=response.status_code,
                 detail=f"FlyHub API Error: {response.text}",
             )
     except Exception as httpx_exception:
-        # Log the error and fall back to curl
-        logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to curl...")
-        return fallback_to_curl(payload)
+        # Log the error and fall back to requests
+        logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to requests...")
+        return fallback_to_requests(payload)
 
-def fallback_to_curl(payload: dict) -> dict:
+def fallback_to_requests(payload: dict) -> dict:
     """
-    Fallback to using curl if both httpx and requests fail.
+    Fallback to requests if httpx fails.
     """
     validate_url(FLYHUB_BASE_URL)
     url = f"{FLYHUB_BASE_URL}/AirSearch"
@@ -433,7 +435,7 @@ def fallback_to_curl(payload: dict) -> dict:
     if not token:
         raise HTTPException(
             status_code=500,
-            detail="Cannot perform curl fallback: Missing authentication token.",
+            detail="Cannot perform requests fallback: Missing authentication token.",
         )
 
     headers = {
@@ -442,36 +444,24 @@ def fallback_to_curl(payload: dict) -> dict:
     }
 
     try:
-        # Prepare curl command
-        curl_command = [
-            "curl",
-            "-X", "POST",
-            url,
-            "-H", f"Authorization: Bearer {token}",
-            "-H", "Content-Type: application/json",
-            "-d", json.dumps(payload)
-        ]
+        # Log the fallback request
+        logger.info("Falling back to requests...")
+        logger.info(f"Sending request to FlyHub via requests: {url}")
 
-        # Execute the curl command and capture the output
-        result = subprocess.run(curl_command, capture_output=True, text=True)
-
-        if result.returncode == 0:
-            return json.loads(result.stdout)
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 200:
+            logger.info("FlyHub response received via requests fallback.")
+            return response.json()
         else:
+            logger.error(f"Requests API Error: {response.status_code}, {response.text}")
             raise HTTPException(
-                status_code=500,
-                detail=f"Curl fallback error: {result.stderr}",
+                status_code=response.status_code,
+                detail=f"Requests API Error: {response.text}",
             )
-
-    except subprocess.SubprocessError as e:
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Requests fallback error: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Subprocess error during curl execution: {str(e)}",
+            detail=f"Requests fallback error: {str(e)}",
         )
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to decode the response from curl.",
-        )
-
 
