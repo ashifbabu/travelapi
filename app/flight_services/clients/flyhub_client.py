@@ -420,12 +420,11 @@ async def fetch_flyhub_flights(payload: dict) -> dict:
     except Exception as httpx_exception:
         # Log the error and fall back to curl
         logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to curl...")
-        return fallback_to_requests(payload)
+        return fallback_to_curl(payload)
 
-
-def fallback_to_requests(payload: dict) -> dict:
+def fallback_to_curl(payload: dict) -> dict:
     """
-    Fallback to requests if httpx fails.
+    Fallback to using curl if both httpx and requests fail.
     """
     validate_url(FLYHUB_BASE_URL)
     url = f"{FLYHUB_BASE_URL}/AirSearch"
@@ -434,7 +433,7 @@ def fallback_to_requests(payload: dict) -> dict:
     if not token:
         raise HTTPException(
             status_code=500,
-            detail="Cannot perform requests fallback: Missing authentication token.",
+            detail="Cannot perform curl fallback: Missing authentication token.",
         )
 
     headers = {
@@ -443,18 +442,36 @@ def fallback_to_requests(payload: dict) -> dict:
     }
 
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        if response.status_code == 200:
-            return response.json()
+        # Prepare curl command
+        curl_command = [
+            "curl",
+            "-X", "POST",
+            url,
+            "-H", f"Authorization: Bearer {token}",
+            "-H", "Content-Type: application/json",
+            "-d", json.dumps(payload)
+        ]
+
+        # Execute the curl command and capture the output
+        result = subprocess.run(curl_command, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            return json.loads(result.stdout)
         else:
             raise HTTPException(
-                status_code=response.status_code,
-                detail=f"Requests API Error: {response.text}",
+                status_code=500,
+                detail=f"Curl fallback error: {result.stderr}",
             )
-    except requests.exceptions.RequestException as e:
+
+    except subprocess.SubprocessError as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Requests fallback error: {str(e)}",
+            detail=f"Subprocess error during curl execution: {str(e)}",
+        )
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to decode the response from curl.",
         )
 
 
