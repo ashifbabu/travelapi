@@ -1,6 +1,5 @@
-#app\flight_services\routes\combined\combined_search.py
-
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi.middleware.gzip import GZipMiddleware
 from app.flight_services.models.combined.combined_search import FlightSearchRequest
 from app.flight_services.services.combined_service import combined_search
 import logging
@@ -16,25 +15,48 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-@router.post("/search", )
-async def search_flights(payload: FlightSearchRequest = Body(...)):
+
+
+
+@router.post("/search")
+async def search_flights(
+    payload: FlightSearchRequest = Body(...),
+    page: int = Query(1, ge=1, description="Page number for pagination"),
+    size: int = Query(50, ge=1, le=100, description="Number of results per page (max 100)"),
+):
     """
-    Perform a combined flight search based on the specified source.
+    Perform a combined flight search based on the specified source with pagination support.
 
     Args:
         payload (FlightSearchRequest): The flight search request payload.
+        page (int): The page number for pagination.
+        size (int): The number of results per page.
 
     Returns:
-        dict: Flight results from BDFare, FlyHub, or both.
+        dict: Paginated flight results from BDFare, FlyHub, or both.
     """
     try:
         logger.info("Received search request: %s", payload.dict())
 
-        # Call the combined search service
-        results = await combined_search(payload)
+        # Call the combined search service with paging parameters
+        results = await combined_search(payload, page=page, size=size)
 
-        logger.info("Search results successfully retrieved.")
-        return results
+        # Apply pagination
+        total_results = len(results["flights"])
+        start = (page - 1) * size
+        end = start + size
+        paginated_flights = results["flights"][start:end]
+
+        # Return paginated response with metadata
+        response = {
+            "page": page,
+            "size": size,
+            "total_results": total_results,
+            "flights": paginated_flights,
+        }
+
+        logger.info("Search results successfully retrieved and paginated.")
+        return response
 
     except ValueError as ve:
         logger.error("Validation error: %s", str(ve))

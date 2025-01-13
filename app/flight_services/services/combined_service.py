@@ -8,13 +8,17 @@ from app.flight_services.adapters.combined_search import format_flight_data_with
 
 # Initialize logger
 logger = logging.getLogger("combined_service")
+logger.setLevel(logging.INFO)
 
-async def combined_search(payload: dict) -> dict:
+async def combined_search(payload: dict, page: int = 1, size: int = 50) -> dict:
     """
     Perform a combined flight search using BDFare and FlyHub APIs based on the source.
+    Supports pagination using page and size parameters.
 
     Args:
         payload (dict): Unified payload for flight search.
+        page (int): Page number for pagination.
+        size (int): Number of results per page.
 
     Returns:
         dict: Formatted flight results from BDFare, FlyHub, or both.
@@ -49,7 +53,7 @@ async def combined_search(payload: dict) -> dict:
         if source == "bdfare":
             # Fetch raw results from BDFare
             logger.info("Fetching results from BDFare...")
-            raw_results["bdfare"] = await fetch_bdfare_flights(enriched_request_data)
+            raw_results["bdfare"] = await fetch_bdfare_flights(enriched_request_data, page=page, size=size)
 
         elif source == "flyhub":
             # Transform payload for FlyHub
@@ -59,7 +63,7 @@ async def combined_search(payload: dict) -> dict:
 
             # Fetch raw results from FlyHub
             logger.info("Fetching results from FlyHub...")
-            raw_results["flyhub"] = await fetch_flyhub_flights(flyhub_payload)
+            raw_results["flyhub"] = await fetch_flyhub_flights(flyhub_payload, page=page, size=size)
 
         elif source == "all":
             # Transform payload for FlyHub
@@ -69,8 +73,8 @@ async def combined_search(payload: dict) -> dict:
 
             # Fetch from both BDFare and FlyHub concurrently
             logger.info("Fetching results from both BDFare and FlyHub...")
-            bdfare_task = fetch_bdfare_flights(enriched_request_data)
-            flyhub_task = fetch_flyhub_flights(flyhub_payload)
+            bdfare_task = fetch_bdfare_flights(enriched_request_data, page=page, size=size)
+            flyhub_task = fetch_flyhub_flights(flyhub_payload, page=page, size=size)
 
             # Await both tasks and handle errors individually
             bdfare_response, flyhub_response = await asyncio.gather(
@@ -98,11 +102,22 @@ async def combined_search(payload: dict) -> dict:
 
         logger.info(f"Raw results retrieved for source: {source}")
 
-        # Format the raw results using the adapter
+        # ✅ Format the raw results using the adapter
         formatted_results = format_flight_data_with_ids(raw_results)
 
+        # ✅ Apply pagination to the results
+        total_flights = len(formatted_results.get("Flights", []))
+        start = (page - 1) * size
+        end = start + size
+        paginated_flights = formatted_results.get("Flights", [])[start:end]
+
         logger.info("Formatted flight search results successfully.")
-        return formatted_results
+        return {
+            "page": page,
+            "size": size,
+            "total_flights": total_flights,
+            "flights": paginated_flights,
+        }
 
     except KeyError as e:
         logger.error(f"Missing key in payload: {e}")

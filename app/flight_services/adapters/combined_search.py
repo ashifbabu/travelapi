@@ -34,10 +34,12 @@ def get_airport_name_by_code(iata_code):
             return airport_name
     logger.warning(f"Airport name not found for IATA code: {iata_code}")
     return "Unknown Airport"
+
+# ✅ Function to format flight data
 def format_flight_data_with_ids(data):
     flights = []
 
-       # Process bdfare
+    # ✅ Process BDFare data
     if "bdfare" in data and data["bdfare"].get("response"):
         trace_id = data["bdfare"]["response"].get("traceId", "N/A")
         offers_group = data["bdfare"]["response"].get("offersGroup", [])
@@ -50,20 +52,14 @@ def format_flight_data_with_ids(data):
                 pax_segments = offer.get("paxSegmentList", [])
                 baggage_list = offer.get("baggageAllowanceList", [])
 
-                # Process segments
+                # ✅ Process segments
                 segments = []
                 for segment_item in pax_segments:
                     pax_segment = segment_item.get("paxSegment", {})
-
-                    # Get airport codes
                     departure_code = pax_segment.get("departure", {}).get("iatA_LocationCode", "")
                     arrival_code = pax_segment.get("arrival", {}).get("iatA_LocationCode", "")
-
-                    # ✅ Get airport names
                     departure_name = get_airport_name_by_code(departure_code)
                     arrival_name = get_airport_name_by_code(arrival_code)
-
-                    # Get airline details
                     airline_code = pax_segment.get('marketingCarrierInfo', {}).get('carrierDesigCode', 'Unknown')
                     airline_data = get_airline_by_id(airline_code)
                     airline_logo = airline_data['logo'] if airline_data else 'Logo not available'
@@ -79,16 +75,17 @@ def format_flight_data_with_ids(data):
                             "Name": arrival_name,
                             "ArrivalTime": pax_segment.get("arrival", {}).get("aircraftScheduledDateTime", "")
                         },
- "Airline": {
-            "Name": pax_segment.get('marketingCarrierInfo', {}).get('carrierName', 'Unknown'),
-             "Code": airline_code,
-                            "Logo": airline_logo 
-        },                        "FlightNumber": pax_segment.get("flightNumber", "Unknown"),
+                        "Airline": {
+                            "Name": pax_segment.get('marketingCarrierInfo', {}).get('carrierName', 'Unknown'),
+                            "Code": airline_code,
+                            "Logo": airline_logo
+                        },
+                        "FlightNumber": pax_segment.get("flightNumber", "Unknown"),
                         "CabinClass": pax_segment.get("cabinType", "Unknown"),
                         "Duration": f"{pax_segment.get('duration', 0)} minutes"
                     })
 
-                # Process pricing
+                # ✅ Process pricing
                 pricing = []
                 for fare_detail in fare_details:
                     fare = fare_detail.get("fareDetail", {})
@@ -103,7 +100,7 @@ def format_flight_data_with_ids(data):
                         "Total": fare.get("subTotal", 0)
                     })
 
-                # Process baggage
+                # ✅ Process baggage
                 baggage = []
                 for baggage_item in baggage_list:
                     baggage_data = baggage_item.get("baggageAllowance", {})
@@ -114,6 +111,7 @@ def format_flight_data_with_ids(data):
                         "Cabin": baggage_data.get("cabin", "Not Available")
                     })
 
+                # ✅ Add flight data
                 flights.append({
                     "Source": source_label,
                     "TraceId": trace_id,
@@ -126,19 +124,19 @@ def format_flight_data_with_ids(data):
                     "SeatsRemaining": int(offer.get("seatsRemaining", 0))
                 })
 
-        if offers_group:  # Ensure offersGroup is not None
+        # Process BDFare offers
+        if offers_group:
             process_offer_group({"ob": offers_group}, "bdfare")
 
-        if special_offers_group:  # Process special offers group under the same source label "bdfare"
+        # Process special offers group
+        if special_offers_group:
             process_offer_group(special_offers_group, "bdfare")
 
-    # Process flyhub
+    # ✅ Process FlyHub data
     if "flyhub" in data and data["flyhub"].get("Results"):
         search_id = data["flyhub"].get("SearchId", "N/A")
         for result in data["flyhub"]["Results"]:
             segment_groups = {}
-
-            # Group segments by SegmentGroup
             for segment in result.get("segments", []):
                 group = segment.get("SegmentGroup", 0)
                 if group not in segment_groups:
@@ -161,14 +159,20 @@ def format_flight_data_with_ids(data):
                                 "Name": seg.get("Destination", {}).get("Airport", {}).get("AirportName", "Unknown"),
                                 "ArrivalTime": seg.get("Destination", {}).get("ArrTime", "Unknown")
                             },
-"Airline": {
-                    "Name": seg.get('Airline', {}).get('AirlineName', 'Unknown'),
-                    "Code": seg.get('Airline', {}).get('AirlineCode', 'Unknown'),
-                     "Logo": get_airline_by_id(seg.get('Airline', {}).get('AirlineCode', 'Unknown'))['logo']
-                },                            "FlightNumber": seg.get("Airline", {}).get("FlightNumber", "Unknown"),
+                            "Airline": {
+                                "Name": seg.get("Airline", {}).get("AirlineName", "Unknown"),
+                                "Code": seg.get("Airline", {}).get("AirlineCode", "Unknown"),
+                                "Logo": get_airline_by_id(seg.get("Airline", {}).get("AirlineCode", "Unknown"))["logo"]
+                            },
+                            "FlightNumber": seg.get("Airline", {}).get("FlightNumber", "Unknown"),
                             "CabinClass": seg.get("Airline", {}).get("CabinClass", "Unknown"),
                             "Duration": f"{seg.get('JourneyDuration', 0)} minutes",
-                            "Baggage": seg.get("baggageDetails", [{}])[0].get("Checkin", "Not Available") if seg.get("baggageDetails") else "Not Available"
+                            "Baggage": (
+    seg.get("baggageDetails", [{}])[0].get("Checkin", "Not Available")
+    if seg.get("baggageDetails") and len(seg.get("baggageDetails")) > 0
+    else "Not Available"
+)
+
                         }
                         for seg in segments
                     ]

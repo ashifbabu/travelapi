@@ -377,9 +377,10 @@ async def fetch_flyhub_airprice(search_id: str, result_id: str):
         )
 
 
-async def fetch_flyhub_flights(payload: dict) -> dict:
+async def fetch_flyhub_flights(payload: dict, page: int = 1, size: int = 50) -> dict:
     """
     Fetch flights from FlyHub API with a fallback to requests.
+    Supports pagination using page and size parameters.
     """
     try:
         # Authenticate and get the token
@@ -400,6 +401,10 @@ async def fetch_flyhub_flights(payload: dict) -> dict:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
+
+        # Add pagination to the payload
+        payload["PageNumber"] = page
+        payload["PageSize"] = size
 
         # Log the request payload
         logger.info(f"Sending request to FlyHub: {url}")
@@ -422,11 +427,13 @@ async def fetch_flyhub_flights(payload: dict) -> dict:
     except Exception as httpx_exception:
         # Log the error and fall back to requests
         logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to requests...")
-        return fallback_to_requests(payload)
+        return fallback_to_requests(payload, page, size)
 
-def fallback_to_requests(payload: dict) -> dict:
+
+def fallback_to_requests(payload: dict, page: int = 1, size: int = 50) -> dict:
     """
     Fallback to requests if httpx fails.
+    Supports pagination using page and size parameters.
     """
     validate_url(FLYHUB_BASE_URL)
     url = f"{FLYHUB_BASE_URL}/AirSearch"
@@ -437,6 +444,10 @@ def fallback_to_requests(payload: dict) -> dict:
             status_code=500,
             detail="Cannot perform requests fallback: Missing authentication token.",
         )
+
+    # Add pagination to the payload
+    payload["PageNumber"] = page
+    payload["PageSize"] = size
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -464,4 +475,3 @@ def fallback_to_requests(payload: dict) -> dict:
             status_code=500,
             detail=f"Requests fallback error: {str(e)}",
         )
-

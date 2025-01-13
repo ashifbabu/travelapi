@@ -5,11 +5,14 @@ import pandas as pd
 import json
 import logging
 from fastapi import Query
+from starlette.middleware.gzip import GZipMiddleware  # ✅ Correct import
+from starlette.middleware.cors import CORSMiddleware
 from typing import List
 from pydantic import BaseModel, Field, validator
 from typing import Optional
 from starlette.middleware.cors import CORSMiddleware
-from app.flight_services.routes.combined import combined_search
+# from app.flight_services.routes.combined import combined_search
+from app.flight_services.routes.combined.combined_search import router as combined_router
 from app.flight_services.routes.rules import router as rules_router
 from app.flight_services.routes.airprice.airprice_routes import router as airprice_router
 from app.flight_services.routes.airprebook.airprebook_routes import router as airprebook_router
@@ -24,7 +27,8 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
-
+# ✅ Add GZip compression middleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Configure logging
 logger = logging.getLogger("main")
 logger.setLevel(logging.INFO)
@@ -123,7 +127,8 @@ def read_airline_logo(airline_id: str):
 
 
 # Register other routes
-app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
+# app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
+app.include_router(combined_router, prefix="/api/combined", tags=["Flights"])
 app.include_router(rules_router, prefix="/api/rules", tags=["Rules"])
 app.include_router(airprice_router, prefix="/api/airprice", tags=["AirPrice"])
 app.include_router(airprebook_router, prefix="/api/airprebook", tags=["AirPreBook"])

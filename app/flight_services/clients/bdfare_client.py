@@ -249,17 +249,23 @@ async def fetch_bdfare_airprice(trace_id: str, offer_ids: list) -> dict:
             detail=f"BDFare API Error: {exc.response.text}"
         )
     
-async def fetch_bdfare_flights(payload: dict) -> dict:
+async def fetch_bdfare_flights(payload: dict, page: int = 1, size: int = 50) -> dict:
     """
-    Fetch flights from BDFare API with a fallback to curl.
+    Fetch flights from BDFare API with pagination support and a fallback to curl.
 
     Args:
         payload (dict): The transformed payload for the BDFare API.
+        page (int): The page number for pagination.
+        size (int): The number of results per page.
 
     Returns:
         dict: The response from the BDFare API.
     """
-    transformed_payload = convert_to_bdfare_request(payload)  # Transform payload
+    # Transform the payload and add pagination
+    transformed_payload = convert_to_bdfare_request(payload)
+    transformed_payload["PageNumber"] = page
+    transformed_payload["PageSize"] = size
+
     url = f"{BDFARE_BASE_URL}/AirShopping"
     headers = {
         "X-API-KEY": BDFARE_API_KEY,
@@ -283,28 +289,33 @@ async def fetch_bdfare_flights(payload: dict) -> dict:
     except Exception as httpx_exception:
         # Log the error and fall back to curl
         logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to curl...")
-        return fallback_to_requests(url, transformed_payload)
-
-
-def fallback_to_requests(url: str, payload: dict) -> dict:
+        return fallback_to_requests(url, transformed_payload, page, size)
+def fallback_to_requests(url: str, payload: dict, page: int = 1, size: int = 50) -> dict:
     """
     Fallback using requests library if httpx or another primary method fails.
+    Supports pagination using page and size parameters.
 
     Args:
         url (str): The API endpoint URL.
         payload (dict): The payload to be sent in the request.
+        page (int): The page number for pagination.
+        size (int): The number of results per page.
 
     Returns:
         dict: The response from the API.
     """
+    # Add pagination to the payload
+    payload["PageNumber"] = page
+    payload["PageSize"] = size
+
     headers = {
         "X-API-KEY": BDFARE_API_KEY,
         "Content-Type": "application/json"
     }
-    
+
     try:
         response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()  # This will raise an HTTPError if the response was an error status code
+        response.raise_for_status()  # Raise HTTPError for bad status codes
         return response.json()
     except requests.exceptions.HTTPError as http_err:
         logger.error(f"HTTP request failed with status {response.status_code}: {response.text}")
