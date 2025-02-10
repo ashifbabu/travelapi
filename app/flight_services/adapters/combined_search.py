@@ -294,6 +294,8 @@ def process_bdfare_offer(offer):
         seg = seg_item.get("paxSegment", {})
         departure = seg.get("departure", {})
         arrival = seg.get("arrival", {})
+        # Add Logo field using marketingCarrierInfo's carrierDesigCode
+        logo = get_airline_by_id(seg.get("marketingCarrierInfo", {}).get("carrierDesigCode", "Unknown")).get("logo", "Logo not available")
         segment_obj = {
             "Departure": {
                 "IATACode": departure.get("iatA_LocationCode"),
@@ -309,6 +311,7 @@ def process_bdfare_offer(offer):
             },
             "MarketingCarrier": seg.get("marketingCarrierInfo", {}),
             "OperatingCarrier": seg.get("operatingCarrierInfo", {}),
+            "Logo": logo,   # <-- Added airline logo here
             "AircraftType": seg.get("iatA_AircraftType", {}).get("iatA_AircraftTypeCode"),
             "RBD": seg.get("rbd"),
             "FlightNumber": seg.get("flightNumber"),
@@ -565,5 +568,3 @@ def format_flight_data_with_ids(data):
 
     return {"Flights": flights}
 
-
-# updated
