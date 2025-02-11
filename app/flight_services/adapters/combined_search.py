@@ -228,6 +228,17 @@ airports_df.rename(columns={
 }, inplace=True)
 airports_df.dropna(subset=['iata_code'], inplace=True)
 
+def get_city_by_code(iata_code):
+    logger.info(f"Fetching city for IATA code: {iata_code}")
+    if airports_df is not None:
+        result = airports_df.loc[airports_df['iata_code'].str.upper() == iata_code.upper(), 'city']
+        if not result.empty:
+            city = result.values[0]
+            logger.info(f"Found city: {city} for IATA code: {iata_code}")
+            return city
+    logger.warning(f"City not found for IATA code: {iata_code}")
+    return "Unknown City"
+
 # ------------------------------------------------------------------------------
 # Helper function: get airport name by IATA code
 # ------------------------------------------------------------------------------
@@ -301,13 +312,15 @@ def process_bdfare_offer(offer):
                 "IATACode": departure.get("iatA_LocationCode"),
                 "Terminal": departure.get("terminalName"),
                 "ScheduledTime": departure.get("aircraftScheduledDateTime"),
-                "AirportName": get_airport_name_by_code(departure.get("iatA_LocationCode"))
+                "AirportName": get_airport_name_by_code(departure.get("iatA_LocationCode")),
+                 "CityName": get_city_by_code(departure.get("iatA_LocationCode"))
             },
             "Arrival": {
                 "IATACode": arrival.get("iatA_LocationCode"),
                 "Terminal": arrival.get("terminalName"),
                 "ScheduledTime": arrival.get("aircraftScheduledDateTime"),
-                "AirportName": get_airport_name_by_code(arrival.get("iatA_LocationCode"))
+                "AirportName": get_airport_name_by_code(arrival.get("iatA_LocationCode")),
+                  "CityName": get_city_by_code(arrival.get("iatA_LocationCode"))
             },
             "MarketingCarrier": seg.get("marketingCarrierInfo", {}),
             "OperatingCarrier": seg.get("operatingCarrierInfo", {}),
@@ -395,13 +408,15 @@ def process_flyhub_result(result):
                 "IATACode": seg.get("Origin", {}).get("Airport", {}).get("AirportCode"),
                 "AirportName": seg.get("Origin", {}).get("Airport", {}).get("AirportName"),
                 "Terminal": seg.get("Origin", {}).get("Airport", {}).get("Terminal"),
-                "ScheduledTime": seg.get("Origin", {}).get("DepTime")
+                "ScheduledTime": seg.get("Origin", {}).get("DepTime"),
+                 "CityName": get_city_by_code(seg.get("Origin", {}).get("Airport", {}).get("AirportCode"))
             },
             "Arrival": {
                 "IATACode": seg.get("Destination", {}).get("Airport", {}).get("AirportCode"),
                 "AirportName": seg.get("Destination", {}).get("Airport", {}).get("AirportName"),
                 "Terminal": seg.get("Destination", {}).get("Airport", {}).get("Terminal"),
-                "ScheduledTime": seg.get("Destination", {}).get("ArrTime")
+                "ScheduledTime": seg.get("Destination", {}).get("ArrTime"),
+                 "CityName": get_city_by_code(seg.get("Destination", {}).get("Airport", {}).get("AirportCode"))
             },
             "Airline": {
                 "Code": seg.get("Airline", {}).get("AirlineCode"),
