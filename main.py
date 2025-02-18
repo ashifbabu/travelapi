@@ -95,13 +95,17 @@ async def search_airports(query: Optional[str] = Query(None, description="Search
 
     query = query.lower().strip()
 
-    # Perform a case-insensitive search
-    results = airports_df[
-        airports_df['city'].str.lower().str.contains(query) |
-        airports_df['country'].str.lower().str.contains(query) |
-        airports_df['airport_name'].str.lower().str.contains(query) |
-        airports_df['iata_code'].str.lower().str.contains(query)
-    ]
+    # Check if the query is exactly 3 letters (airport code)
+    if len(query) == 3 and query.isalpha():
+        results = airports_df[airports_df['iata_code'].str.lower() == query]
+    else:
+        # Perform a case-insensitive search across multiple columns
+        results = airports_df[
+            airports_df['city'].str.lower().str.contains(query) |
+            airports_df['country'].str.lower().str.contains(query) |
+            airports_df['airport_name'].str.lower().str.contains(query) |
+            airports_df['iata_code'].str.lower().str.contains(query)
+        ]
 
     # Limit the results to 8
     limited_results = results.head(8)
@@ -114,7 +118,7 @@ async def search_airports(query: Optional[str] = Query(None, description="Search
             airportName=row['airport_name'],
             code=row['iata_code']
         )
-        for index, row in limited_results.iterrows()
+        for _, row in limited_results.iterrows()
     ]
 
 
