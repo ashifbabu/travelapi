@@ -16,8 +16,6 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 
-
-
 @router.post("/search")
 async def search_flights(
     payload: FlightSearchRequest = Body(...),
@@ -38,10 +36,11 @@ async def search_flights(
     try:
         logger.info("Received search request: %s", payload.dict())
 
-        # Call the combined search service with paging parameters
+        # Call the combined search service
+        # NOTE: combined_search() now returns ALL flights without slicing.
         results = await combined_search(payload, page=page, size=size)
 
-        # Apply pagination
+        # Now apply pagination ONCE here in the router
         total_results = len(results["flights"])
         start = (page - 1) * size
         end = start + size
