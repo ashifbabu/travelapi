@@ -22,54 +22,33 @@ async def search_flights(
     page: int = Query(1, ge=1, description="Page number for pagination"),
     size: int = Query(100, ge=1, le=100, description="Number of results per page (max 100)"),
 ):
-    """
-    Perform a combined flight search based on the specified source with pagination support.
-
-    Args:
-        payload (FlightSearchRequest): The flight search request payload.
-        page (int): The page number for pagination.
-        size (int): The number of results per page.
-
-    Returns:
-        dict: Paginated flight results from BDFare, FlyHub, or both.
-    """
     try:
-        logger.info("Received search request: %s", payload.dict())
-
         # Call the combined search service
-        # NOTE: combined_search() now returns ALL flights without slicing.
         results = await combined_search(payload, page=page, size=size)
 
-        # Now apply pagination ONCE here in the router
-        total_results = len(results["flights"])
-        start = (page - 1) * size
-        end = start + size
-        paginated_flights = results["flights"][start:end]
+        # Previously, you sliced the results here...
+        # total_results = len(results["flights"])
+        # start = (page - 1) * size
+        # end = start + size
+        # paginated_flights = results["flights"][start:end]
 
         # Return paginated response with metadata
         response = {
             "page": page,
             "size": size,
-            "total_results": total_results,
-            "flights": paginated_flights,
+            "flights": results["flights"],
         }
-
-        logger.info("Search results successfully retrieved and paginated.")
         return response
 
     except ValueError as ve:
-        logger.error("Validation error: %s", str(ve))
         raise HTTPException(status_code=422, detail=f"Validation Error: {str(ve)}")
-
     except HTTPException as he:
-        logger.error("HTTP error: %s", he.detail)
         raise he
-
     except Exception as e:
-        logger.exception("Unexpected error occurred during the flight search.")
         raise HTTPException(
             status_code=500, detail=f"An unexpected error occurred: {str(e)}"
         )
+
 
 
 

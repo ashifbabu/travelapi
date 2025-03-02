@@ -3,6 +3,7 @@ from typing import List
 import httpx
 import json
 import requests
+import asyncio
 from typing import Dict, Any
 from fastapi import HTTPException
 import os
@@ -251,15 +252,7 @@ async def fetch_bdfare_airprice(trace_id: str, offer_ids: list) -> dict:
     
 async def fetch_bdfare_flights(payload: dict, page: int = 1, size: int = 50) -> dict:
     """
-    Fetch flights from BDFare API with pagination support and a fallback to curl.
-
-    Args:
-        payload (dict): The transformed payload for the BDFare API.
-        page (int): The page number for pagination.
-        size (int): The number of results per page.
-
-    Returns:
-        dict: The response from the BDFare API.
+    Fetch flights from BDFare API with pagination support and a fallback to a synchronous call wrapped in an executor.
     """
     # Transform the payload and add pagination
     transformed_payload = convert_to_bdfare_request(payload)
@@ -273,38 +266,29 @@ async def fetch_bdfare_flights(payload: dict, page: int = 1, size: int = 50) -> 
     }
 
     try:
-        # Attempt to fetch data using httpx
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(url, json=transformed_payload, headers=headers)
-
         if response.status_code == 200:
-            logger.info(f"BDFare API Response: {response.json()}")
             return response.json()
         else:
-            logger.error(f"BDFare API returned an error: {response.text}")
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"BDFare API Error: {response.text}",
+                detail=f"BDFare API Error: {response.text}"
             )
-    except Exception as httpx_exception:
-        # Log the error and fall back to curl
-        logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to curl...")
-        return fallback_to_requests(url, transformed_payload, page, size)
+    except Exception:
+        # If httpx fails, fallback to the synchronous request using run_in_executor
+        return await fallback_to_requests_async(url, transformed_payload, page, size)
+
+
+async def fallback_to_requests_async(url: str, payload: dict, page: int = 1, size: int = 50) -> dict:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: fallback_to_requests(url, payload, page, size))
+
+
 def fallback_to_requests(url: str, payload: dict, page: int = 1, size: int = 50) -> dict:
     """
-    Fallback using requests library if httpx or another primary method fails.
-    Supports pagination using page and size parameters.
-
-    Args:
-        url (str): The API endpoint URL.
-        payload (dict): The payload to be sent in the request.
-        page (int): The page number for pagination.
-        size (int): The number of results per page.
-
-    Returns:
-        dict: The response from the API.
+    Fallback using the requests library if httpx fails.
     """
-    # Add pagination to the payload
     payload["PageNumber"] = page
     payload["PageSize"] = size
 
@@ -315,29 +299,29 @@ def fallback_to_requests(url: str, payload: dict, page: int = 1, size: int = 50)
 
     try:
         response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()  # Raise HTTPError for bad status codes
+        response.raise_for_status()  # Raise an HTTPError for bad status codes
         return response.json()
-    except requests.exceptions.HTTPError as http_err:
-        logger.error(f"HTTP request failed with status {response.status_code}: {response.text}")
+    except requests.exceptions.HTTPError:
         raise HTTPException(
             status_code=response.status_code,
             detail=f"HTTP request failed: {response.text}"
         )
     except requests.exceptions.RequestException as req_err:
-        logger.error(f"Request failed: {str(req_err)}")
         raise HTTPException(
             status_code=500,
             detail=f"Network or request error during API call: {str(req_err)}"
         )
     except json.JSONDecodeError as json_err:
-        logger.error(f"Failed to decode JSON response: {response.text}")
         raise HTTPException(
             status_code=500,
             detail=f"JSON decoding failed: {str(json_err)}"
         )
     except Exception as e:
-        logger.exception("An unexpected error occurred during the request fallback.")
         raise HTTPException(
             status_code=500,
             detail=f"An unexpected error occurred: {str(e)}"
         )
+
+# Dummy convert_to_bdfare_request for completeness (replace with your actual implementation)
+def convert_to_bdfare_request(payload: dict) -> dict:
+    return payload

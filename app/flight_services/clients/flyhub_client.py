@@ -377,75 +377,75 @@ async def fetch_flyhub_airprice(search_id: str, result_id: str):
         )
 
 
+import asyncio
+import httpx
+import requests
+from fastapi import HTTPException
+
+# Replace these with your actual constants or import them as needed.
+FLYHUB_BASE_URL = "https://your-flyhub-url.com"
+
+# get_flyhub_token(), validate_url(), and cached_token are assumed to be defined elsewhere.
+
 async def fetch_flyhub_flights(payload: dict, page: int = 1, size: int = 50) -> dict:
     """
     Fetch flights from FlyHub API with a fallback to requests.
     Supports pagination using page and size parameters.
     """
+    token = get_flyhub_token()
+    if not token:
+        raise HTTPException(
+            status_code=500, detail="FlyHub authentication failed. Token is None."
+        )
+
+    validate_url(FLYHUB_BASE_URL)
+    url = f"{FLYHUB_BASE_URL}/AirSearch"
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    # Add pagination to the payload
+    payload["PageNumber"] = page
+    payload["PageSize"] = size
+
     try:
-        # Authenticate and get the token
-        token = get_flyhub_token()
-        if not token:
-            raise HTTPException(
-                status_code=500, detail="FlyHub authentication failed. Token is None."
-            )
-
-        # Validate FlyHub Base URL
-        validate_url(FLYHUB_BASE_URL)
-
-        # FlyHub API endpoint
-        url = f"{FLYHUB_BASE_URL}/AirSearch"
-
-        # Headers with the token
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
-
-        # Add pagination to the payload
-        payload["PageNumber"] = page
-        payload["PageSize"] = size
-
-        # Log the request payload
-        logger.info(f"Sending request to FlyHub: {url}")
-        logger.info(f"Headers: {headers}")
-        logger.info(f"Payload: {payload}")
-
-        # Attempt to fetch data using httpx
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(url, json=payload, headers=headers)
-
         if response.status_code == 200:
-            logger.info("FlyHub response received successfully.")
             return response.json()
         else:
-            logger.error(f"FlyHub API Error: {response.status_code}, {response.text}")
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"FlyHub API Error: {response.text}",
+                detail=f"FlyHub API Error: {response.text}"
             )
-    except Exception as httpx_exception:
-        # Log the error and fall back to requests
-        logger.error(f"HTTPX request failed: {httpx_exception}. Falling back to requests...")
-        return fallback_to_requests(payload, page, size)
+    except Exception:
+        # Fall back to synchronous request wrapped in an executor
+        return await fallback_to_requests_async_flyhub(payload, page, size)
 
 
-def fallback_to_requests(payload: dict, page: int = 1, size: int = 50) -> dict:
+async def fallback_to_requests_async_flyhub(payload: dict, page: int = 1, size: int = 50) -> dict:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None, lambda: fallback_to_requests_flyhub(payload, page, size)
+    )
+
+
+def fallback_to_requests_flyhub(payload: dict, page: int = 1, size: int = 50) -> dict:
     """
-    Fallback to requests if httpx fails.
+    Fallback to the requests library if httpx fails.
     Supports pagination using page and size parameters.
     """
     validate_url(FLYHUB_BASE_URL)
     url = f"{FLYHUB_BASE_URL}/AirSearch"
     token = cached_token.get("token", None)
-
     if not token:
         raise HTTPException(
             status_code=500,
-            detail="Cannot perform requests fallback: Missing authentication token.",
+            detail="Cannot perform requests fallback: Missing authentication token."
         )
 
-    # Add pagination to the payload
     payload["PageNumber"] = page
     payload["PageSize"] = size
 
@@ -455,23 +455,16 @@ def fallback_to_requests(payload: dict, page: int = 1, size: int = 50) -> dict:
     }
 
     try:
-        # Log the fallback request
-        logger.info("Falling back to requests...")
-        logger.info(f"Sending request to FlyHub via requests: {url}")
-
         response = requests.post(url, json=payload, headers=headers)
         if response.status_code == 200:
-            logger.info("FlyHub response received via requests fallback.")
             return response.json()
         else:
-            logger.error(f"Requests API Error: {response.status_code}, {response.text}")
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"Requests API Error: {response.text}",
+                detail=f"Requests API Error: {response.text}"
             )
     except requests.exceptions.RequestException as e:
-        logger.error(f"Requests fallback error: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Requests fallback error: {str(e)}",
+            detail=f"Requests fallback error: {str(e)}"
         )
