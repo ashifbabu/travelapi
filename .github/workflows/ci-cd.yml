@@ -23,24 +23,26 @@ jobs:
           chmod 400 citykey.pem
 
           ssh -o StrictHostKeyChecking=no -i citykey.pem $USER@$HOST << 'EOF'
-            set -e  # Stop on any error
+            set -e
 
-            echo "🔁 Switching to project directory..."
             cd /home/ubuntu/travelapi || {
-              echo "📂 Cloning repo since folder does not exist..."
               git clone https://github.com/ashifbabu/travelapi.git /home/ubuntu/travelapi
               cd /home/ubuntu/travelapi
             }
 
-            echo "🔄 Resetting to latest main branch..."
             git fetch --all
             git reset --hard origin/main
 
-            echo "🛑 Stopping existing Docker containers (if any)..."
-            docker-compose down || true
+            echo "🛑 Removing old container..."
+            docker rm -f fastapi_app || true
 
-            echo "🐳 Rebuilding and starting Docker containers..."
-            docker-compose up -d --build
+            echo "🐳 Rebuilding container..."
+            docker build -t fastapi-app .
 
-            echo "✅ Deployment complete."
+            echo "🚀 Running container..."
+            docker run -d \
+              --name fastapi_app \
+              -p 8000:8000 \
+              --restart always \
+              fastapi-app
           EOF
