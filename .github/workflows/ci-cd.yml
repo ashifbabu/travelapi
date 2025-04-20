@@ -20,7 +20,7 @@ jobs:
 
       - name: Deploy to EC2
         env:
-          HOST: ec2-13-215-182-72.ap-southeast-1.compute.amazonaws.com
+          HOST: ec2-13-229-215-11.ap-southeast-1.compute.amazonaws.com
           KEY: ${{ secrets.EC2_KEY }}
           USER: ubuntu
         run: |

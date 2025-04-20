@@ -7,3 +7,4 @@ gunicorn
 pydantic[email]
 pandas
 requests
+redis

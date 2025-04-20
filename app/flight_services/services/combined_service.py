@@ -4,7 +4,7 @@ from app.flight_services.clients.bdfare_client import fetch_bdfare_flights
 from app.flight_services.clients.flyhub_client import fetch_flyhub_flights
 from app.flight_services.adapters.flyhub_adapter import convert_bdfare_to_flyhub
 from app.flight_services.adapters.combined_search import format_flight_data_with_ids
-
+from app.cache import get_formatted_flights
 async def combined_search(payload: dict, page: int = 1, size: int = 100) -> dict:
     """
     Perform a combined flight search using BDFare and FlyHub APIs based on the source.
@@ -62,7 +62,7 @@ async def combined_search(payload: dict, page: int = 1, size: int = 100) -> dict
         else:
             raise ValueError(f"Invalid source specified: {source}")
 
-        formatted_results = format_flight_data_with_ids(raw_results)
+        formatted_results = get_formatted_flights(raw_results, format_flight_data_with_ids)
         return {"flights": formatted_results.get("Flights", [])}
 
     except KeyError as e:
