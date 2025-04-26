@@ -17,7 +17,8 @@ load_dotenv()
 
 # Load API credentials from environment variables
 BDFARE_BASE_URL = os.getenv("BDFARE_BASE_URL")
-BDFARE_API_KEY = os.getenv("BDFARE_API_KEY")
+BDFARE_API_KEY = "T0I1U0RWam5NVHlQWSV5ZmlDTms4ZlZFM0heQ1prOHNfWXdaQnB6dyN1MXJHIVZPX0hKalkka2ZGcTRoNyFTIw=="
+
 
 # Validate environment variables
 if not BDFARE_BASE_URL or not BDFARE_API_KEY:

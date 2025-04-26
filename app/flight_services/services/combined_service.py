@@ -4,11 +4,13 @@ from app.flight_services.clients.bdfare_client import fetch_bdfare_flights
 from app.flight_services.clients.flyhub_client import fetch_flyhub_flights
 from app.flight_services.adapters.flyhub_adapter import convert_bdfare_to_flyhub
 from app.flight_services.adapters.combined_search import format_flight_data_with_ids
-from app.cache import get_formatted_flights
+# Removed: from app.cache import get_formatted_flights
+
 async def combined_search(payload: dict, page: int = 1, size: int = 100) -> dict:
     """
     Perform a combined flight search using BDFare and FlyHub APIs based on the source.
     Pagination is applied at the external API call level (upstream).
+    Caching functionality has been removed.
 
     Args:
         payload (dict): The flight search request payload.
@@ -19,6 +21,7 @@ async def combined_search(payload: dict, page: int = 1, size: int = 100) -> dict
         dict: A unified structure containing the flight results.
     """
     try:
+        # Assumes payload is Pydantic model, convert to dict
         request_payload = payload.dict()
         point_of_sale = request_payload.get("pointOfSale")
         source = request_payload.get("source")
@@ -49,32 +52,49 @@ async def combined_search(payload: dict, page: int = 1, size: int = 100) -> dict
             flyhub_payload = convert_bdfare_to_flyhub(request_data)
             bdfare_task = fetch_bdfare_flights(enriched_request_data, page=page, size=size)
             flyhub_task = fetch_flyhub_flights(flyhub_payload, page=page, size=size)
+            
+            # Use return_exceptions=True to prevent one failing task from cancelling the other
             bdfare_response, flyhub_response = await asyncio.gather(
                 bdfare_task, flyhub_task, return_exceptions=True
             )
+            
+            # Handle exceptions from gather if necessary, or assign results/None
             if isinstance(bdfare_response, Exception):
-                bdfare_response = None
+                 # Log the exception or handle specifically if needed
+                 # logger.error("BDFare task failed", exc_info=bdfare_response)
+                 bdfare_response = None # Or handle the error appropriately
             if isinstance(flyhub_response, Exception):
-                flyhub_response = None
+                 # Log the exception or handle specifically if needed
+                 # logger.error("FlyHub task failed", exc_info=flyhub_response)
+                 flyhub_response = None # Or handle the error appropriately
+
             raw_results["bdfare"] = bdfare_response
             raw_results["flyhub"] = flyhub_response
 
         else:
             raise ValueError(f"Invalid source specified: {source}")
 
-        formatted_results = get_formatted_flights(raw_results, format_flight_data_with_ids)
+        # Format the raw results directly, bypassing the cache function
+        # Assumes format_flight_data_with_ids takes the raw_results dict
+        # and returns the desired structured format.
+        # Based on the original code, get_formatted_flights likely passed raw_results
+        # to format_flight_data_with_ids.
+        formatted_results = format_flight_data_with_ids(raw_results)
+
+        # Return the formatted results in the expected structure
         return {"flights": formatted_results.get("Flights", [])}
+
 
     except KeyError as e:
         raise HTTPException(status_code=422, detail=f"Missing key in payload: {e}")
     except ValueError as ve:
         raise HTTPException(status_code=422, detail=f"Validation Error: {str(ve)}")
     except HTTPException as he:
+        # Re-raise HTTPExceptions we intentionally raised
         raise he
     except Exception as e:
+        # Catch any other unexpected errors
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
-
 
 # for raw data
 
