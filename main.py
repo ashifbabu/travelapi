@@ -13,12 +13,15 @@ from typing import Optional
 from starlette.middleware.cors import CORSMiddleware
 # from app.flight_services.routes.combined import combined_search
 from app.flight_services.routes.combined.combined_search import router as combined_router
-from app.flight_services.routes.rules import router as rules_router
+# from app.flight_services.routes.rules import router as rules_router
 from app.flight_services.routes.airprice.airprice_routes import router as airprice_router
 from app.flight_services.routes.airprebook.airprebook_routes import router as airprebook_router
 from app.flight_services.routes.airbook.airbook_routes import router as airbook_router
 from app.flight_services.routes.airretrieve.airretrieve_routes import router as airretrieve_router
 from app.flight_services.services.ailineLogoService import get_airline_by_id
+from app.flight_services.routes.airRules.air_rules_routes import router as airRules_router
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Travel Services API",
@@ -133,11 +136,13 @@ def read_airline_logo(airline_id: str):
 # Register other routes
 # app.include_router(combined_search.router, prefix="/api/combined", tags=["Flights"])
 app.include_router(combined_router, prefix="/api/combined", tags=["Flights"])
-app.include_router(rules_router, prefix="/api/rules", tags=["Rules"])
+# app.include_router(rules_router, prefix="/api/rules", tags=["Rules"])
 app.include_router(airprice_router, prefix="/api/airprice", tags=["AirPrice"])
 app.include_router(airprebook_router, prefix="/api/airprebook", tags=["AirPreBook"])
 app.include_router(airbook_router, prefix="/api/airbook", tags=["AirBook"])
 app.include_router(airretrieve_router, prefix="/api/airretrieve", tags=["AirRetrieve"])
+app.include_router(airRules_router, prefix="/api/airrules", tags=["AirRules"])
+
 
 @app.get("/", tags=["Health"])
 async def health_check():

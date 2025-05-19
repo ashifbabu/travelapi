@@ -19,8 +19,9 @@ load_dotenv()
 # BDFARE_BASE_URL = os.getenv("BDFARE_BASE_URL")
 BDFARE_BASE_URL = "https://bdf.centralindia.cloudapp.azure.com/api/enterprise"
 # BDFARE_API_KEY = os.getenv("BDFARE_API_KEY")
-# For testing server
+# #For testing server
 # BDFARE_API_KEY = "bFJvP3Nnb2kkVk9OV1FpdiUwMmxiVldHWWNGbktVNDlXY0xOekpQQl4jJC0xTGpLJGp2OFAyRUdBeCU1T1VQSw=="
+
 #for production server
 BDFARE_API_KEY = "T0I1U0RWam5NVHlQWSV5ZmlDTms4ZlZFM0heQ1prOHNfWXdaQnB6dyN1MXJHIVZPX0hKalkka2ZGcTRoNyFTIw=="
 
@@ -327,6 +328,59 @@ def fallback_to_requests(url: str, payload: dict, page: int = 1, size: int = 50)
             status_code=500,
             detail=f"An unexpected error occurred: {str(e)}"
         )
+    
+
+# START OF NEW FUNCTION
+async def fetch_bdfare_farerules(trace_id: str, offer_id: str) -> dict:
+    """
+    Fetch fare rules from BDFare API for a single offer using the confirmed payload structure.
+    """
+    url = f"{BDFARE_BASE_URL}/FareRules"
+    headers = {"X-API-KEY": BDFARE_API_KEY, "Content-Type": "application/json"}
+    
+    # CORRECTED PAYLOAD based on user confirmation
+    payload = {
+        "traceId": trace_id,  # camelCase
+        "offerId": offer_id   # camelCase
+    }
+
+    logger.info(f"Sending FareRules request to BDFare API. URL: {url}")
+    logger.debug(f"Headers: {headers}")
+    try:
+        # Log the exact payload being sent for verification
+        logger.debug(f"Payload being sent to BDFare for FareRules: {json.dumps(payload)}")
+    except Exception:
+        logger.debug(f"Payload for FareRules (raw, could not json.dumps): {payload}")
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+
+        logger.info(f"BDFare FareRules Response Status Code: {response.status_code}")
+        logger.debug(f"BDFare FareRules Response Body: {response.text}")
+
+        response.raise_for_status() # Will raise an exception for 4xx/5xx responses
+        return response.json()
+
+    except httpx.ReadTimeout as exc:
+        logger.error(f"BDFare API FareRules request timed out: {exc}")
+        raise HTTPException(status_code=504, detail="The BDFare API FareRules request timed out.")
+
+    except httpx.RequestError as exc: # Covers connection errors, DNS issues etc.
+        logger.error(f"Request error while contacting BDFare API for FareRules: {exc}")
+        raise HTTPException(status_code=503, detail=f"An error occurred while contacting BDFare API for FareRules: {str(exc)}")
+
+    except httpx.HTTPStatusError as exc: # Specific HTTP errors from server (4xx, 5xx)
+        logger.error(f"BDFare API FareRules error. Status Code: {exc.response.status_code}, Detail: {exc.response.text}")
+        # The detail from exc.response.text is the raw error from BDFare
+        raise HTTPException(
+            status_code=exc.response.status_code,
+            detail=f"BDFare API FareRules Error: {exc.response.text}"
+        )
+    except Exception as e: # Catch-all for any other unexpected errors
+        logger.exception("Unexpected error during BDFare FareRules request.")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during FareRules request: {str(e)}")
+
 
 # Dummy convert_to_bdfare_request for completeness (replace with your actual implementation)
 def convert_to_bdfare_request(payload: dict) -> dict:
