@@ -16,7 +16,12 @@ logger = logging.getLogger("bdfare_client")
 load_dotenv()
 
 # Load API credentials from environment variables
-BDFARE_BASE_URL = os.getenv("BDFARE_BASE_URL")
+# BDFARE_BASE_URL = os.getenv("BDFARE_BASE_URL")
+BDFARE_BASE_URL = "https://bdf.centralindia.cloudapp.azure.com/api/enterprise"
+# BDFARE_API_KEY = os.getenv("BDFARE_API_KEY")
+# For testing server
+# BDFARE_API_KEY = "bFJvP3Nnb2kkVk9OV1FpdiUwMmxiVldHWWNGbktVNDlXY0xOekpQQl4jJC0xTGpLJGp2OFAyRUdBeCU1T1VQSw=="
+#for production server
 BDFARE_API_KEY = "T0I1U0RWam5NVHlQWSV5ZmlDTms4ZlZFM0heQ1prOHNfWXdaQnB6dyN1MXJHIVZPX0hKalkka2ZGcTRoNyFTIw=="
 
 
@@ -250,7 +255,7 @@ async def fetch_bdfare_airprice(trace_id: str, offer_ids: list) -> dict:
             status_code=exc.response.status_code,
             detail=f"BDFare API Error: {exc.response.text}"
         )
-    
+    #clients/bdfare_client.py
 async def fetch_bdfare_flights(payload: dict, page: int = 1, size: int = 50) -> dict:
     """
     Fetch flights from BDFare API with pagination support and a fallback to a synchronous call wrapped in an executor.
